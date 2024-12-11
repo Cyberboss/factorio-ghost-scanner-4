@@ -168,7 +168,7 @@ const RemoveSensor = (id: UnitNumber) => {
 };
 
 const ClearCombinator = (controlBehavior: LuaConstantCombinatorControlBehavior) => {
-    // TODO
+    // TODO: Combinator Clearing
     // control_behavior.parameters = nil
 };
 
@@ -284,7 +284,7 @@ const GetGhostsAsSignals = (
     force: any,
     prev_entry: any
 ): GhostsAsSignals => {
-    //TODO
+    //TODO: GetGhostsAsSignals
 };
 
 const UpdateSensor = (ghostScanner: GhostScanner) => {
