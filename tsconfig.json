@@ -8,12 +8,13 @@
             "@typescript-to-lua/language-extensions",
             "lua-types/5.2",
             "typed-factorio/prototype",
-            "typed-factorio/runtime"
+            "typed-factorio/runtime",
+            "typed-factorio/settings"
         ],
         "strict": true
     },
     "tstl": {
         "luaTarget": "JIT"
     },
-    "include": ["src/data.ts", "src/control.ts"]
+    "include": ["src/data.ts", "src/control.ts", "src/settings.ts"]
 }
