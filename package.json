@@ -1,13 +1,16 @@
 {
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "rimraf build && copy-folder public build && tstl && copy-folder src build && git clean -fxd src/**/*.lua && git clean -fxd build/**/*.ts && node package.js"
+    "build": "rimraf build && copy-folder public build && tstl -p src/tsconfig.json && copy-folder src build && git clean -fxd src/**/*.lua && git clean -fxd build/**/*.ts && node package.js",
+    "install_mod": "yarn build && copyfiles -f build/*.zip ~/AppData/Roaming/Factorio/mods"
   },
   "packageManager": "yarn@4.3.1",
   "dependencies": {
     "@eslint/js": "^9.16.0",
     "archiver": "^7.0.1",
     "copy-folder-util": "^1.1.4",
+    "copyfiles": "^2.4.1",
     "eslint": "^9.16.0",
     "eslint-plugin-import": "^2.31.0",
     "lua-types": "^2.13.1",
@@ -17,5 +20,8 @@
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.0",
     "typescript-to-lua": "^1.28.1"
+  },
+  "devDependencies": {
+    "@types/copyfiles": "^2"
   }
 }

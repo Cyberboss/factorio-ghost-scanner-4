@@ -1,13 +1,11 @@
-import Info from "./public/info.json";
+import Info from "./build/info.json" with { type: "json" };
 
-const fs = require("fs");
-const archiver = require("archiver");
-
-Info.version;
+import * as fs from "fs";
+import archiver from "archiver";
 
 const packageName = `${Info.name}_${Info.version}`;
 
-const output = fs.createWriteStream(`${packageName}.zip`);
+const output = fs.createWriteStream(`build/${packageName}.zip`);
 
 const archive = archiver("zip", {
     zlib: { level: 9 } // Sets the compression level.

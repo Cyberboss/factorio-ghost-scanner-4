@@ -16,5 +16,5 @@
     "tstl": {
         "luaTarget": "JIT"
     },
-    "include": ["src/data.ts", "src/control.ts", "src/settings.ts"]
+    "include": ["data.ts", "control.ts", "settings.ts"]
 }
