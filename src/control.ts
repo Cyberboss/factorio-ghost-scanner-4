@@ -186,7 +186,7 @@ const UpdateArea = () => {
                 if (num < scanAreasPerTick) {
                     if (!storage.scanSignals.has(id)) {
                         storage.signalIndexes.delete(id);
-                        storage.scanSignals.set(id, GetGhostsAsSignals(id, cell, force, {}));
+                        storage.scanSignals.set(id, GetGhostsAsSignals(id, cell, force, undefined));
                     } else {
                         storage.scanSignals.set(
                             id,
@@ -280,9 +280,9 @@ const IsInBBox = (pos: any, area: any) => {
 
 const GetGhostsAsSignals = (
     id: UnitNumber,
-    cell: any,
-    force: any,
-    prev_entry: any
+    cell: LuaLogisticCell,
+    force: LuaForce,
+    prev_entry?: GhostsAsSignals
 ): GhostsAsSignals => {
     //TODO: GetGhostsAsSignals
 };
