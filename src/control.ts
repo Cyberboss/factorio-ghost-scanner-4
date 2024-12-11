@@ -1,4 +1,5 @@
 import {
+    BoundingBox,
     ItemStackDefinition,
     LogisticFilter,
     LuaConstantCombinatorControlBehavior,
@@ -6,6 +7,7 @@ import {
     LuaEntityPrototype,
     LuaForce,
     LuaLogisticCell,
+    MapPosition,
     NthTickEventData,
     OnBuiltEntityEvent,
     OnEntityDiedEvent,
@@ -32,7 +34,7 @@ interface Signal {
     signal: SignalFilter;
 }
 
-interface GhostsAsSignals {}
+type GhostsAsSignals = LuaMap<SignalFilter, LogisticFilter>;
 
 interface GhostScanner {
     id: UnitNumber;
@@ -45,12 +47,12 @@ interface ScanArea {
 }
 
 interface Storage {
-    lookupItemsToPlaceThis: LuaMap<string, ItemStackDefinition[] | undefined>;
+    lookupItemsToPlaceThis: LuaMap<string, ItemStackDefinition[]>;
     ghostScanners: GhostScanner[];
     scanSignals: LuaMap<UnitNumber, GhostsAsSignals>;
     signalIndexes: LuaMap<UnitNumber, LuaMap<string, SignalFilter>>;
     scanAreas: LuaMap<UnitNumber, ScanArea>;
-    foundEntities: LuaMap<UnitNumber, any>;
+    foundEntities: LuaMap<UnitNumber, LuaSet<UnitNumber | MapPosition>>;
     updateTimeout: boolean;
     updateIndex: number;
     initMod: boolean;
@@ -63,10 +65,10 @@ const ScannerName = "ghost-scanner";
 let scanAreasPerTick = settings.global[AreasPerTickSetting].value as number;
 let updateInteval = settings.global[UpdateIntervalSetting].value as number;
 let scanAreasDelay = settings.global[ScanAreasDelaySetting].value as number;
-let maxResults: number | null = settings.global[MaxResultsSetting].value as number;
+let maxResults: number | undefined = settings.global[MaxResultsSetting].value as number;
 
 if (maxResults == 0) {
-    maxResults = null;
+    maxResults = undefined;
 }
 
 let showHidden = settings.global[ShowHiddenSetting].value as boolean;
@@ -91,17 +93,14 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
             maxResults = settings.global[MaxResultsSetting].value as number;
 
             if (maxResults == 0) {
-                maxResults = null;
+                maxResults = undefined;
             }
 
             break;
         }
         case ShowHiddenSetting: {
             showHidden = settings.global[ShowHiddenSetting].value as boolean;
-            storage.lookupItemsToPlaceThis = new LuaMap<
-                string,
-                ItemStackDefinition[] | undefined
-            >();
+            storage.lookupItemsToPlaceThis = new LuaMap<string, ItemStackDefinition[]>();
             break;
         }
         case NegativeOutputSetting: {
@@ -232,7 +231,7 @@ const UpdateArea = () => {
 
 const GetItemsToPlace = (prototype: LuaEntityPrototype) => {
     if (showHidden) {
-        storage.lookupItemsToPlaceThis.set(prototype.name, prototype.items_to_place_this);
+        storage.lookupItemsToPlaceThis.set(prototype.name, prototype.items_to_place_this || []);
     } else {
         const itemsToPlaceFiltered: ItemStackDefinition[] = [];
         if (prototype.items_to_place_this) {
@@ -247,16 +246,16 @@ const GetItemsToPlace = (prototype: LuaEntityPrototype) => {
         storage.lookupItemsToPlaceThis.set(prototype.name, itemsToPlaceFiltered);
     }
 
-    return storage.lookupItemsToPlaceThis.get(prototype.name);
+    return storage.lookupItemsToPlaceThis.get(prototype.name)!;
 };
 
-let signals: LuaMap<any, LogisticFilter>;
+let signals: GhostsAsSignals | undefined = undefined;
 const AddSignal = (id: UnitNumber, name: string, count: number) => {
     const signalIndex = storage.signalIndexes.get(id)?.get(name);
 
     let s: LogisticFilter;
-    if (signalIndex && signals.has(signalIndex)) {
-        s = signals.get(signalIndex)!;
+    if (signalIndex && signals!.has(signalIndex)) {
+        s = signals!.get(signalIndex)!;
     } else {
         s = {
             value: {
@@ -269,10 +268,10 @@ const AddSignal = (id: UnitNumber, name: string, count: number) => {
     }
 };
 
-const IsInBBox = (pos: any, area: any) => {
+const IsInBBox = (pos: MapPosition, area: BoundingBox) => {
     return (
         pos.x >= area.left_top.x &&
-        pos.x <= area.right_botton.x &&
+        pos.x <= area.right_bottom.x &&
         pos.y >= area.left_top.y &&
         pos.y <= area.right_bottom.y
     );
@@ -284,7 +283,147 @@ const GetGhostsAsSignals = (
     force: LuaForce,
     prev_entry?: GhostsAsSignals
 ): GhostsAsSignals => {
-    //TODO: GetGhostsAsSignals
+    let resultLimit = maxResults;
+
+    let foundEntities = storage.foundEntities.get(id);
+    if (!foundEntities) {
+        foundEntities = new LuaSet<UnitNumber | MapPosition>();
+        storage.foundEntities.set(id, foundEntities);
+    }
+
+    signals = prev_entry;
+
+    if (!signals) {
+        signals = new LuaMap<SignalFilter, LogisticFilter>();
+        storage.signalIndexes.set(id, new LuaMap<string, SignalFilter>());
+    } else if (!storage.signalIndexes.has(id)) {
+        storage.signalIndexes.set(id, new LuaMap<string, SignalFilter>());
+    }
+
+    if (!cell.valid) {
+        return new LuaMap<SignalFilter, LogisticFilter>();
+    }
+
+    const pos = cell.owner.position;
+    const r = cell.construction_radius;
+
+    if (r <= 0) {
+        let test: any = null;
+        test!.asdf = 4;
+    }
+
+    const bounds: BoundingBox = {
+        left_top: {
+            x: pos.x - r,
+            y: pos.y - r
+        },
+        right_bottom: {
+            x: pos.x + r,
+            y: pos.y + r
+        }
+    };
+    const innerBounds: BoundingBox = {
+        left_top: {
+            x: pos.x - r + 0.001,
+            y: pos.y - r + 0.001
+        },
+        right_bottom: {
+            x: pos.x + r - 0.001,
+            y: pos.y + r - 0.001
+        }
+    };
+
+    const searchArea = {
+        bounds,
+        innerBounds,
+        force,
+        surface: cell.owner.surface
+    };
+
+    let entities = searchArea.surface.find_entities_filtered({
+        area: searchArea.innerBounds,
+        limit: resultLimit,
+        type: "cliff"
+    });
+    let countUniqueEntities = 0;
+
+    for (const e of entities) {
+        const uid = e.unit_number || e.position;
+        if (
+            !foundEntities.has(uid) &&
+            e.to_be_deconstructed() &&
+            e.prototype.cliff_explosive_prototype
+        ) {
+            foundEntities.add(uid);
+            AddSignal(id, e.prototype.cliff_explosive_prototype, 1);
+            ++countUniqueEntities;
+        }
+
+        if (maxResults) {
+            resultLimit! -= countUniqueEntities;
+            countUniqueEntities = 0;
+        }
+    }
+
+    if (!maxResults || resultLimit! > 0) {
+        entities = searchArea.surface.find_entities_filtered({
+            area: searchArea.bounds,
+            limit: resultLimit,
+            to_be_upgraded: true,
+            force: searchArea.force
+        });
+
+        countUniqueEntities = 0;
+
+        for (const e of entities) {
+            const uid = e.unit_number!;
+            const upgradePrototype = e.get_upgrade_target()[0];
+            if (!foundEntities.has(uid) && upgradePrototype) {
+                if (IsInBBox(e.position, searchArea.bounds)) {
+                    foundEntities.add(uid);
+                    const entityName = upgradePrototype.name;
+
+                    for (const itemStack of storage.lookupItemsToPlaceThis?.get(
+                        upgradePrototype.name
+                    ) || GetItemsToPlace(upgradePrototype)) {
+                        const itemStackCount = itemStack.count!;
+                        AddSignal(id, itemStack.name, itemStackCount);
+                        countUniqueEntities += itemStackCount;
+                    }
+                }
+            }
+        }
+
+        if (maxResults) {
+            resultLimit! -= countUniqueEntities;
+        }
+    }
+
+    if (!maxResults || resultLimit! > 0) {
+        entities = searchArea.surface.find_entities_filtered({
+            area: searchArea.bounds,
+            type: "entity-ghost"
+        });
+        countUniqueEntities = 0;
+        for (const e of entities) {
+            const uid = e.unit_number!;
+            if (!foundEntities.has(uid)) {
+                if (IsInBBox(e.position, searchArea.bounds)) {
+                    foundEntities.add(uid);
+                    for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
+                        GetItemsToPlace(e.ghost_prototype as LuaEntityPrototype)) {
+                        const itemStackCount = itemStack.count!;
+                        AddSignal(id, itemStack.name, itemStackCount);
+                        countUniqueEntities -= itemStackCount;
+                    }
+
+                    for (const requestItem of e.item_requests) {
+                        // TODO: Figure out if add signal needs quality or some shit
+                    }
+                }
+            }
+        }
+    }
 };
 
 const UpdateSensor = (ghostScanner: GhostScanner) => {
@@ -395,7 +534,7 @@ const InitStorage = () => {
     storage.signalIndexes =
         storage.signalIndexes || new LuaMap<UnitNumber, LuaMap<string, SignalFilter>>();
     storage.foundEntities = storage.foundEntities || new LuaMap<UnitNumber, any>();
-    storage.lookupItemsToPlaceThis = new LuaMap<string, ItemStackDefinition[] | undefined>();
+    storage.lookupItemsToPlaceThis = new LuaMap<string, ItemStackDefinition[]>();
 };
 
 script.on_load(() => {
