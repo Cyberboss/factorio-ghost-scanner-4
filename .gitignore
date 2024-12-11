@@ -12,5 +12,6 @@
 #!.yarn/cache
 .pnp.*
 node_modules/**
+build/**
 
 *.lua
