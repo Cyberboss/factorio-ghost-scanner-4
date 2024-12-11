@@ -1,7 +1,17 @@
+import {
+    AreasPerTickSetting,
+    MaxResultsSetting,
+    NegativeOutputSetting,
+    RoundToStackSetting,
+    ScanAreasDelaySetting,
+    ShowHiddenSetting,
+    UpdateIntervalSetting
+} from "./setting_names";
+
 data.extend([
     {
         type: "int-setting",
-        name: "ghost-scanner-scan-areas-per-tick",
+        name: AreasPerTickSetting,
         order: "aa",
         setting_type: "runtime-global",
         default_value: 5,
@@ -10,7 +20,7 @@ data.extend([
     },
     {
         type: "int-setting",
-        name: "ghost-scanner-update-interval",
+        name: UpdateIntervalSetting,
         order: "ab",
         setting_type: "runtime-global",
         default_value: 180,
@@ -19,7 +29,7 @@ data.extend([
     },
     {
         type: "int-setting",
-        name: "ghost-scanner-area-scan-delay",
+        name: ScanAreasDelaySetting,
         order: "aba",
         setting_type: "runtime-global",
         default_value: 5,
@@ -28,7 +38,7 @@ data.extend([
     },
     {
         type: "int-setting",
-        name: "ghost-scanner-max-results",
+        name: MaxResultsSetting,
         order: "ac",
         setting_type: "runtime-global",
         default_value: 1000,
@@ -36,21 +46,21 @@ data.extend([
     },
     {
         type: "bool-setting",
-        name: "ghost-scanner-show-hidden",
+        name: ShowHiddenSetting,
         order: "ad",
         setting_type: "runtime-global",
         default_value: false
     },
     {
         type: "bool-setting",
-        name: "ghost-scanner-negative-output",
+        name: NegativeOutputSetting,
         order: "ba",
         setting_type: "runtime-global",
         default_value: false
     },
     {
         type: "bool-setting",
-        name: "ghost-scanner-round2stack",
+        name: RoundToStackSetting,
         order: "bb",
         setting_type: "runtime-global",
         default_value: false

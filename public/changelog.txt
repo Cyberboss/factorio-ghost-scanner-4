@@ -1,9 +1,11 @@
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.0
 Date: 2024-12-11
-  Features:
+  Changes:
     - Ported to Typescript
     - Ported to Factorio 2.0
+    - Removed custom technology, now unlocked by advanced combinators
+    - Removed defunct cell count signal
 ---------------------------------------------------------------------------------------------------
 Version: 2.2.0
 Date: 2023-10-11
