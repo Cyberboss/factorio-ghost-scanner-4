@@ -299,10 +299,12 @@ const AddSignal = (id: UnitNumber, name: string, count: number, quality?: Qualit
                 name,
                 quality
             },
-            min: invertSign ? -count : count
+            min: 0
         };
         signals!.push(s);
     }
+
+    (s as any).min = s.min! + (invertSign ? -count : count);
 };
 
 const IsInBBox = (pos: MapPosition, area: BoundingBox) => {
