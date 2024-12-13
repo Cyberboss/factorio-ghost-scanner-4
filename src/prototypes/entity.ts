@@ -1,5 +1,5 @@
 import { Sprite4Way } from "factorio:prototype";
-import { table, by_pixel } from "util";
+import { by_pixel, table } from "util";
 
 const layers = {
     layers: [
@@ -22,7 +22,7 @@ const layers = {
         }
     ]
 };
-declare function make_4way_animation_from_spritesheet(this: void, input: any): Sprite4Way;
+declare function make_4way_animation_from_spritesheet(input: any): Sprite4Way;
 const sprites = make_4way_animation_from_spritesheet(layers);
 
 const scanner = table.deepcopy(data.raw["constant-combinator"]["constant-combinator"])!;

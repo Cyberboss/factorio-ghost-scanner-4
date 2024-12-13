@@ -3,11 +3,12 @@
   "version": "4.0.0",
   "title": "Ghost Scanner 4",
   "author": "Dominion and Tiavor",
-  "contact": "Coderbus guild on Discord: https://discord.gg/Vh8TJp9. Look for dominion",
+  "contact": "dominion on Discord. In the Factorio guild",
   "homepage": "",
   "description": "Adds a combinator reading ghost requests from the logistic network it's placed in.",
   "factorio_version": "2.0",
   "dependencies": [
-    "base >= 2.0.0"
+    "base >= 2.0.0",
+    "! GhostScanner2"
   ]
 }

@@ -68,6 +68,12 @@ interface Storage {
 
 declare const storage: Storage;
 
+const ModLog = (message: string) => {
+    // uncomment to debug
+    //game.print(message);
+    //log(message);
+};
+
 const ScannerName = "ghost-scanner";
 
 let scanAreasPerTick = settings.global[AreasPerTickSetting].value as number;
@@ -82,12 +88,8 @@ if (maxResults == 0) {
 let showHidden = settings.global[ShowHiddenSetting].value as boolean;
 let invertSign = settings.global[NegativeOutputSetting].value as boolean;
 let roundToStack = settings.global[RoundToStackSetting].value as boolean;
-
-const ModLog = (message: string) => {
-    game.print(message);
-};
-
 script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
+    ModLog("Settings changed");
     let updateEventHandlers = false;
 
     switch (event.setting) {
@@ -145,6 +147,8 @@ const OnEntityCreated = (
     if (entity.valid && entity.name == ScannerName) {
         ModLog("Found new ghost scanner");
 
+        entity.operable = false;
+
         storage.ghostScanners.push({
             id: entity.unit_number!,
             entity: entity
@@ -181,9 +185,11 @@ const RemoveSensor = (id: UnitNumber) => {
 };
 
 const ClearCombinator = (controlBehavior: LuaConstantCombinatorControlBehavior) => {
-    const section = controlBehavior.get_section(1);
-    if (section) {
-        section.filters = [];
+    if (controlBehavior.sections_count != 0) {
+        ModLog("Cleaning scanner");
+        for (let i = 1; i <= controlBehavior.sections_count; ++i) {
+            controlBehavior.remove_section(1);
+        }
     }
 };
 
@@ -195,6 +201,7 @@ const UpdateArea = () => {
 
     let num = 1;
     for (const [id, cells] of storage.scanAreas) {
+        ModLog(`Update scanner ${id}`);
         let tempAreas = [];
         if (cells && cells.cells && cells.cells.length > 0) {
             const force = cells.force;
@@ -222,25 +229,21 @@ const UpdateArea = () => {
                     const controlBehavior =
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
 
-                    if (storage.scanSignals.has(id)) {
-                        ClearCombinator(controlBehavior);
+                    ClearCombinator(controlBehavior);
+                    const signalsForCombinator = storage.scanSignals.get(id);
+                    if (signalsForCombinator && signalsForCombinator.length > 0) {
+                        ModLog(`Setting filters for scanner ${id}`);
+                        const section = controlBehavior.add_section()!;
+                        section.filters = signalsForCombinator;
                     } else {
-                        if (controlBehavior.sections_count != 1) {
-                            for (let i = 1; i <= controlBehavior.sections_count; ++i) {
-                                controlBehavior.remove_section(i);
-                            }
-
-                            controlBehavior.add_section();
-                        }
-
-                        const section = controlBehavior.get_section(1)!;
-                        section.filters = storage.scanSignals.get(id)!;
+                        ModLog(`No filters for scanner ${id}`);
                     }
 
                     break;
                 }
 
                 if (j == 0) {
+                    ModLog(`Error: Did not find scanner with ID ${id}`);
                     CleanUp(id);
                 }
             }
@@ -252,6 +255,8 @@ const UpdateArea = () => {
 
             storage.scanAreas.delete(id);
             storage.foundEntities.delete(id);
+        } else {
+            ModLog("Error: Cells check failed");
         }
     }
 };
@@ -290,7 +295,7 @@ const AddSignal = (id: UnitNumber, name: string, count: number, quality?: Qualit
         s = {
             value: {
                 comparator: "=",
-                type: "virtual",
+                type: "item",
                 name,
                 quality
             },
@@ -342,7 +347,8 @@ const GetGhostsAsSignals = (
     const r = cell.construction_radius;
 
     if (r <= 0) {
-        let test: any = null;
+        ModLog("Assertion failed");
+        let test: any = undefined;
         test!.asdf = 4;
     }
 
@@ -591,6 +597,7 @@ const InitMod = () => {
         });
 
         for (const entity of entities) {
+            entity.operable = false;
             storage.ghostScanners.push({
                 id: entity.unit_number!,
                 entity: entity
@@ -615,7 +622,7 @@ const OnTick = (event: OnTickEvent) => {
     }
 
     if (!storage.updateTimeout) {
-        if (storage.updateIndex > storage.ghostScanners.length) {
+        if (storage.updateIndex >= storage.ghostScanners.length) {
             storage.updateIndex = 0;
             storage.updateTimeout = true;
         } else {
@@ -662,12 +669,18 @@ const InitStorage = () => {
 };
 
 script.on_load(() => {
+    InitEvents();
+});
+
+script.on_init(() => {
+    ModLog("On Init");
     InitStorage();
     InitMod();
     InitEvents();
 });
 
 script.on_configuration_changed(() => {
+    ModLog("Config changed");
     InitStorage();
     InitEvents();
 });

@@ -14,7 +14,8 @@
         "strict": true
     },
     "tstl": {
-        "luaTarget": "JIT"
+        "luaTarget": "JIT",
+        "noImplicitSelf": true
     },
     "include": ["data.ts", "control.ts", "settings.ts"]
 }
