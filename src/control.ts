@@ -1,12 +1,14 @@
 import {
     BoundingBox,
+    ComparatorString,
     ItemStackDefinition,
-    LogisticFilter,
+    LogisticFilterWrite,
     LuaConstantCombinatorControlBehavior,
     LuaEntity,
     LuaEntityPrototype,
     LuaForce,
     LuaLogisticCell,
+    LuaTilePrototype,
     MapPosition,
     NthTickEventData,
     OnBuiltEntityEvent,
@@ -15,9 +17,12 @@ import {
     OnRobotBuiltEntityEvent,
     OnRobotPreMinedEvent,
     OnTickEvent,
+    QualityID,
     ScriptRaisedBuiltEvent,
     ScriptRaisedReviveEvent,
     SignalFilter,
+    SignalIDType,
+    uint64,
     UnitNumber
 } from "factorio:runtime";
 import {
@@ -34,7 +39,7 @@ interface Signal {
     signal: SignalFilter;
 }
 
-type GhostsAsSignals = LuaMap<SignalFilter, LogisticFilter>;
+type GhostsAsSignals = LogisticFilterWrite[];
 
 interface GhostScanner {
     id: UnitNumber;
@@ -49,10 +54,13 @@ interface ScanArea {
 interface Storage {
     lookupItemsToPlaceThis: LuaMap<string, ItemStackDefinition[]>;
     ghostScanners: GhostScanner[];
-    scanSignals: LuaMap<UnitNumber, GhostsAsSignals>;
-    signalIndexes: LuaMap<UnitNumber, LuaMap<string, SignalFilter>>;
+    scanSignals: LuaMap<UnitNumber, LogisticFilterWrite[]>;
+    signalIndexes: LuaMap<UnitNumber, LuaMap<string, number>>;
     scanAreas: LuaMap<UnitNumber, ScanArea>;
-    foundEntities: LuaMap<UnitNumber, LuaSet<UnitNumber | MapPosition>>;
+    foundEntities: LuaMap<
+        UnitNumber,
+        LuaSet<UnitNumber | MapPosition | LuaMultiReturn<[uint64, uint64, defines.target_type]>>
+    >;
     updateTimeout: boolean;
     updateIndex: number;
     initMod: boolean;
@@ -167,8 +175,10 @@ const RemoveSensor = (id: UnitNumber) => {
 };
 
 const ClearCombinator = (controlBehavior: LuaConstantCombinatorControlBehavior) => {
-    // TODO: Combinator Clearing
-    // control_behavior.parameters = nil
+    const section = controlBehavior.get_section(1);
+    if (section) {
+        section.filters = [];
+    }
 };
 
 const UpdateArea = () => {
@@ -204,10 +214,20 @@ const UpdateArea = () => {
                 if (id == ghostScanner.id) {
                     const controlBehavior =
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
-                    const combinator_logistic_section = controlBehavior.get_section(1);
 
                     if (storage.scanSignals.has(id)) {
                         ClearCombinator(controlBehavior);
+                    } else {
+                        if (controlBehavior.sections_count != 1) {
+                            for (let i = 1; i <= controlBehavior.sections_count; ++i) {
+                                controlBehavior.remove_section(i);
+                            }
+
+                            controlBehavior.add_section();
+                        }
+
+                        const section = controlBehavior.get_section(1)!;
+                        section.filters = storage.scanSignals.get(id)!;
                     }
 
                     break;
@@ -229,7 +249,7 @@ const UpdateArea = () => {
     }
 };
 
-const GetItemsToPlace = (prototype: LuaEntityPrototype) => {
+const GetItemsToPlace = (prototype: LuaEntityPrototype | LuaTilePrototype) => {
     if (showHidden) {
         storage.lookupItemsToPlaceThis.set(prototype.name, prototype.items_to_place_this || []);
     } else {
@@ -250,21 +270,26 @@ const GetItemsToPlace = (prototype: LuaEntityPrototype) => {
 };
 
 let signals: GhostsAsSignals | undefined = undefined;
-const AddSignal = (id: UnitNumber, name: string, count: number) => {
-    const signalIndex = storage.signalIndexes.get(id)?.get(name);
+const AddSignal = (id: UnitNumber, name: string, count: number, quality?: QualityID) => {
+    const indexesForID = storage.signalIndexes.get(id)!;
+    let signalIndex = indexesForID.get(name);
 
-    let s: LogisticFilter;
-    if (signalIndex && signals!.has(signalIndex)) {
-        s = signals!.get(signalIndex)!;
+    let s: LogisticFilterWrite;
+    if (signalIndex && signals![signalIndex]) {
+        s = signals![signalIndex];
     } else {
+        signalIndex = signals!.length;
+        indexesForID.set(name, signalIndex);
         s = {
             value: {
                 comparator: "=",
                 type: "virtual",
-                name
+                name,
+                quality
             },
             min: invertSign ? -count : count
         };
+        signals!.push(s);
     }
 };
 
@@ -287,21 +312,23 @@ const GetGhostsAsSignals = (
 
     let foundEntities = storage.foundEntities.get(id);
     if (!foundEntities) {
-        foundEntities = new LuaSet<UnitNumber | MapPosition>();
+        foundEntities = new LuaSet<
+            UnitNumber | MapPosition | LuaMultiReturn<[uint64, uint64, defines.target_type]>
+        >();
         storage.foundEntities.set(id, foundEntities);
     }
 
     signals = prev_entry;
 
     if (!signals) {
-        signals = new LuaMap<SignalFilter, LogisticFilter>();
-        storage.signalIndexes.set(id, new LuaMap<string, SignalFilter>());
+        signals = [];
+        storage.signalIndexes.set(id, new LuaMap<string, number>());
     } else if (!storage.signalIndexes.has(id)) {
-        storage.signalIndexes.set(id, new LuaMap<string, SignalFilter>());
+        storage.signalIndexes.set(id, new LuaMap<string, number>());
     }
 
     if (!cell.valid) {
-        return new LuaMap<SignalFilter, LogisticFilter>();
+        return [];
     }
 
     const pos = cell.owner.position;
@@ -352,6 +379,7 @@ const GetGhostsAsSignals = (
         if (
             !foundEntities.has(uid) &&
             e.to_be_deconstructed() &&
+            e.is_registered_for_deconstruction(force) &&
             e.prototype.cliff_explosive_prototype
         ) {
             foundEntities.add(uid);
@@ -377,17 +405,16 @@ const GetGhostsAsSignals = (
 
         for (const e of entities) {
             const uid = e.unit_number!;
-            const upgradePrototype = e.get_upgrade_target()[0];
+            const upgradeTarget = e.get_upgrade_target();
+            const upgradePrototype = upgradeTarget[0];
             if (!foundEntities.has(uid) && upgradePrototype) {
                 if (IsInBBox(e.position, searchArea.bounds)) {
                     foundEntities.add(uid);
-                    const entityName = upgradePrototype.name;
-
                     for (const itemStack of storage.lookupItemsToPlaceThis?.get(
                         upgradePrototype.name
                     ) || GetItemsToPlace(upgradePrototype)) {
                         const itemStackCount = itemStack.count!;
-                        AddSignal(id, itemStack.name, itemStackCount);
+                        AddSignal(id, itemStack.name, itemStackCount, upgradeTarget[1]);
                         countUniqueEntities += itemStackCount;
                     }
                 }
@@ -402,7 +429,9 @@ const GetGhostsAsSignals = (
     if (!maxResults || resultLimit! > 0) {
         entities = searchArea.surface.find_entities_filtered({
             area: searchArea.bounds,
-            type: "entity-ghost"
+            type: "entity-ghost",
+            force: searchArea.force,
+            limit: resultLimit
         });
         countUniqueEntities = 0;
         for (const e of entities) {
@@ -411,19 +440,98 @@ const GetGhostsAsSignals = (
                 if (IsInBBox(e.position, searchArea.bounds)) {
                     foundEntities.add(uid);
                     for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
-                        GetItemsToPlace(e.ghost_prototype as LuaEntityPrototype)) {
+                        GetItemsToPlace(e.ghost_prototype)) {
                         const itemStackCount = itemStack.count!;
-                        AddSignal(id, itemStack.name, itemStackCount);
+                        AddSignal(id, itemStack.name, itemStackCount, e.quality);
                         countUniqueEntities -= itemStackCount;
                     }
 
                     for (const requestItem of e.item_requests) {
-                        // TODO: Figure out if add signal needs quality or some shit
+                        AddSignal(
+                            id,
+                            requestItem.name,
+                            requestItem.count,
+                            prototypes.quality[requestItem.quality]
+                        );
+                        countUniqueEntities += requestItem.count;
                     }
                 }
             }
         }
+
+        if (maxResults) {
+            resultLimit! -= countUniqueEntities;
+        }
     }
+
+    if (!maxResults || resultLimit! > 0) {
+        entities = searchArea.surface.find_entities_filtered({
+            area: searchArea.innerBounds,
+            limit: resultLimit,
+            type: "item-request-proxy",
+            force: searchArea.force
+        });
+        countUniqueEntities = 0;
+        for (const e of entities) {
+            const uid = script.register_on_object_destroyed(e);
+            if (!foundEntities.has(uid)) {
+                foundEntities.add(uid);
+                for (const requestItem of e.item_requests) {
+                    AddSignal(id, requestItem.name, requestItem.count, requestItem.quality);
+                    countUniqueEntities -= requestItem.count;
+                }
+            }
+        }
+
+        if (maxResults) {
+            resultLimit! -= countUniqueEntities;
+        }
+    }
+
+    if (!maxResults || resultLimit! > 0) {
+        entities = searchArea.surface.find_entities_filtered({
+            area: searchArea.innerBounds,
+            limit: resultLimit,
+            type: "tile-ghost",
+            force: searchArea.force
+        });
+        countUniqueEntities = 0;
+        for (const e of entities) {
+            const uid = e.unit_number!;
+            if (!foundEntities.has(uid)) {
+                foundEntities.add(uid);
+                for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
+                    GetItemsToPlace(e.ghost_prototype)) {
+                    const count = itemStack.count!;
+                    AddSignal(id, itemStack.name, count, itemStack.quality);
+                    countUniqueEntities -= count;
+                }
+            }
+        }
+
+        if (maxResults) {
+            resultLimit! -= countUniqueEntities;
+        }
+    }
+
+    if (roundToStack) {
+        let roundFunc = invertSign ? math.floor : math.ceil;
+
+        for (const signal of signals!) {
+            const filter = signal.value! as {
+                readonly type?: SignalIDType;
+                readonly name: string;
+                readonly quality?: QualityID;
+                readonly comparator?: ComparatorString;
+            };
+            const prototype = prototypes.item[filter.name];
+            const stackSize = prototype.stack_size;
+            const count = signal.min!;
+            (signal as any).min = roundFunc(count / stackSize) * stackSize;
+        }
+    }
+
+    return signals;
 };
 
 const UpdateSensor = (ghostScanner: GhostScanner) => {

@@ -2,7 +2,7 @@
 Version: 4.0.0
 Date: 2024-12-11
   Changes:
-    - Ported to Typescript
+    - Ported to Typescript (Original mod by Tiavor: https://mods.factorio.com/mod/GhostScanner2)
     - Ported to Factorio 2.0
     - Removed custom technology, now unlocked by advanced combinators
     - Removed defunct cell count signal
