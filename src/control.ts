@@ -83,6 +83,10 @@ let showHidden = settings.global[ShowHiddenSetting].value as boolean;
 let invertSign = settings.global[NegativeOutputSetting].value as boolean;
 let roundToStack = settings.global[RoundToStackSetting].value as boolean;
 
+const ModLog = (message: string) => {
+    game.print(message);
+};
+
 script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
     let updateEventHandlers = false;
 
@@ -139,6 +143,8 @@ const OnEntityCreated = (
 ) => {
     const entity = event.entity;
     if (entity.valid && entity.name == ScannerName) {
+        ModLog("Found new ghost scanner");
+
         storage.ghostScanners.push({
             id: entity.unit_number!,
             entity: entity
@@ -183,6 +189,7 @@ const ClearCombinator = (controlBehavior: LuaConstantCombinatorControlBehavior) 
 
 const UpdateArea = () => {
     if (!storage.scanAreas) {
+        ModLog("No scan areas, no area update");
         return;
     }
 
@@ -538,6 +545,7 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
     const controlBehavior =
         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
     if (!controlBehavior.enabled) {
+        ModLog("Combinator disabled, not updating");
         ClearCombinator(controlBehavior);
         CleanUp(ghostScanner.id);
         return;
@@ -550,10 +558,15 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
         );
 
         if (!logisticNetwork) {
+            ModLog("Combinator has no logi-network!");
             ClearCombinator(controlBehavior);
             CleanUp(ghostScanner.id);
             return;
         }
+
+        ModLog(
+            `Adding loginet ID ${logisticNetwork.network_id} from combinator ${ghostScanner.id}`
+        );
 
         storage.scanSignals.delete(ghostScanner.id);
         storage.signalIndexes.delete(ghostScanner.id);
@@ -567,9 +580,11 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
 
 const InitMod = () => {
     if (storage.initMod) {
+        ModLog("Skipping mod init");
         return;
     }
 
+    ModLog("Initializing mod for first time");
     for (const [_, surface] of game.surfaces) {
         const entities = surface.find_entities_filtered({
             name: ScannerName
@@ -633,7 +648,8 @@ function UpdateEventHandlers() {
 }
 
 const InitStorage = () => {
-    storage.initMod = false;
+    ModLog("Initializing Storage");
+    storage.initMod = storage.initMod || false;
     storage.scanSignals = new LuaMap<UnitNumber, GhostsAsSignals>();
     storage.updateTimeout = storage.updateTimeout || false;
     storage.ghostScanners = storage.ghostScanners || [];
