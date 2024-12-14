@@ -10,7 +10,6 @@ import {
     LuaLogisticCell,
     LuaTilePrototype,
     MapPosition,
-    NthTickEventData,
     OnBuiltEntityEvent,
     OnEntityDiedEvent,
     OnPrePlayerMinedItemEvent,
@@ -25,6 +24,7 @@ import {
     uint64,
     UnitNumber
 } from "factorio:runtime";
+
 import {
     AreasPerTickSetting,
     MaxResultsSetting,
@@ -34,10 +34,6 @@ import {
     ShowHiddenSetting,
     UpdateIntervalSetting
 } from "./setting_names";
-
-interface Signal {
-    signal: SignalFilter;
-}
 
 type GhostsAsSignals = LogisticFilterWrite[];
 
@@ -68,6 +64,7 @@ interface Storage {
 
 declare const storage: Storage;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ModLog = (message: string) => {
     // uncomment to debug
     //game.print(message);
@@ -202,7 +199,7 @@ const UpdateArea = () => {
     let num = 1;
     for (const [id, cells] of storage.scanAreas) {
         ModLog(`Update scanner ${id}`);
-        let tempAreas = [];
+        const tempAreas = [];
         if (cells && cells.cells && cells.cells.length > 0) {
             const force = cells.force;
             for (const cell of cells.cells) {
@@ -304,6 +301,7 @@ const AddSignal = (id: UnitNumber, name: string, count: number, quality?: Qualit
         signals!.push(s);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (s as any).min = s.min! + (invertSign ? -count : count);
 };
 
@@ -347,12 +345,6 @@ const GetGhostsAsSignals = (
 
     const pos = cell.owner.position;
     const r = cell.construction_radius;
-
-    if (r <= 0) {
-        ModLog("Assertion failed");
-        let test: any = undefined;
-        test!.asdf = 4;
-    }
 
     const bounds: BoundingBox = {
         left_top: {
@@ -530,7 +522,7 @@ const GetGhostsAsSignals = (
     }
 
     if (roundToStack) {
-        let roundFunc = invertSign ? math.floor : math.ceil;
+        const roundFunc = invertSign ? math.floor : math.ceil;
 
         for (const signal of signals!) {
             const filter = signal.value! as {
@@ -542,6 +534,7 @@ const GetGhostsAsSignals = (
             const prototype = prototypes.item[filter.name];
             const stackSize = prototype.stack_size;
             const count = signal.min!;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (signal as any).min = roundFunc(count / stackSize) * stackSize;
         }
     }
@@ -593,7 +586,7 @@ const InitMod = () => {
     }
 
     ModLog("Initializing mod for first time");
-    for (const [_, surface] of game.surfaces) {
+    for (const [, surface] of game.surfaces) {
         const entities = surface.find_entities_filtered({
             name: ScannerName
         });
@@ -636,7 +629,7 @@ const OnTick = (event: OnTickEvent) => {
     UpdateArea();
 };
 
-const OnNthTick = (event: NthTickEventData) => {
+const OnNthTick = () => {
     storage.updateTimeout = false;
 };
 
@@ -666,7 +659,12 @@ const InitStorage = () => {
     storage.updateIndex = storage.updateIndex || 0;
     storage.signalIndexes =
         storage.signalIndexes || new LuaMap<UnitNumber, LuaMap<string, SignalFilter>>();
-    storage.foundEntities = storage.foundEntities || new LuaMap<UnitNumber, any>();
+    storage.foundEntities =
+        storage.foundEntities ||
+        new LuaMap<
+            UnitNumber,
+            LuaSet<UnitNumber | MapPosition | LuaMultiReturn<[uint64, uint64, defines.target_type]>>
+        >();
     storage.lookupItemsToPlaceThis = new LuaMap<string, ItemStackDefinition[]>();
 };
 
