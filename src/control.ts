@@ -77,7 +77,7 @@ const ModLog = (message: string) => {
 const ScannerName = "ghost-scanner";
 
 let scanAreasPerTick = settings.global[AreasPerTickSetting].value as number;
-let updateInteval = settings.global[UpdateIntervalSetting].value as number;
+let updateInterval = settings.global[UpdateIntervalSetting].value as number;
 let scanAreasDelay = settings.global[ScanAreasDelaySetting].value as number;
 let maxResults: number | undefined = settings.global[MaxResultsSetting].value as number;
 
@@ -94,7 +94,7 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
 
     switch (event.setting) {
         case UpdateIntervalSetting: {
-            updateInteval = settings.global[UpdateIntervalSetting].value as number;
+            updateInterval = settings.global[UpdateIntervalSetting].value as number;
             updateEventHandlers = true;
             break;
         }
@@ -645,7 +645,7 @@ function UpdateEventHandlers() {
     const entityCount = storage.ghostScanners.length;
     if (entityCount > 0) {
         script.on_event(defines.events.on_tick, OnTick);
-        script.on_nth_tick(math.floor(updateInteval + 1), OnNthTick);
+        script.on_nth_tick(math.floor(updateInterval + 1), OnNthTick);
         script.on_event(defines.events.on_pre_player_mined_item, OnEntityRemoved);
         script.on_event(defines.events.on_robot_pre_mined, OnEntityRemoved);
         script.on_event(defines.events.on_entity_died, OnEntityRemoved);
