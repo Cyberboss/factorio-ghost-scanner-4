@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "rimraf build && copy-folder public build && tstl -p src/tsconfig.json && copy-folder src build && git clean -fxd src/**/*.lua && git clean -fxd build/**/*.ts && node package.js",
+    "build": "rimraf build && copy-folder public build && copy-folder locale build/locale && tstl -p src/tsconfig.json && copy-folder src build && git clean -fxd src/**/*.lua && git clean -fxd build/**/*.ts && node package.js",
     "install_mod": "yarn build && copyfiles -f build/*.zip ~/AppData/Roaming/Factorio/mods"
   },
   "packageManager": "yarn@4.3.1",
