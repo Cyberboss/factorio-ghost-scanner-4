@@ -61,7 +61,7 @@ jobs:
               run: echo "zip_path=$(find build -maxdepth 1 -name "*.zip" -print -quit)" >> $GITHUB_OUTPUT
 
             - name: Generate Artifact Attestation
-              uses: actions/attest-build-provenance@v1
+              uses: actions/attest-build-provenance@v2
               with:
                   subject-path: ${{ steps.get-zip.outputs.zip_path }}
 
