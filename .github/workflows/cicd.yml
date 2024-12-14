@@ -1,0 +1,82 @@
+name: CI Pipeline
+
+on: push
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node-version: [23.x]
+        permissions:
+            id-token: write
+            attestations: write
+        steps:
+            - name: Setup Node ${{ matrix.node-version }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Restore Yarn cache
+              uses: actions/cache@v4
+              with:
+                  path: .yarn/cache
+                  key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+
+            - name: Setup Yarn
+              run: corepack enable
+
+            - name: Install Yarn Dependencies
+              run: |
+                  unbuffer yarn install --immutable | tee yarn_output.log
+                  if cat yarn_output.log | grep YN0060; then
+                    echo "Detected incompatible peer dependencies!"
+                    exit 1
+                  fi
+
+            - name: Build
+              run: yarn build
+
+            - name: Run ESLint
+              run: yarn eslint
+
+            - name: Run Prettier
+              run: yarn prettier -c .
+
+            - name: Discover Zip Path
+              id: get-zip
+              run: echo "zip_path=$(find build -maxdepth 1 -name "*.zip" -print -quit)" >> $GITHUB_OUTPUT
+
+            - name: Generate Artifact Attestation
+              uses: actions/attest-build-provenance@v1
+              with:
+                  subject-path: ${{ steps.get-zip.outputs.zip_path }}
+
+            - name: Upload Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: mod-build
+                  path: ${{ steps.get-zip.outputs.zip_path }}
+
+            - name: Check if version is tagged
+              id: get-tag
+              run: |
+                  set +ea
+                  git describe --exact-match HEAD
+                  if [ $? -eq 0 ]; then
+                    echo "deploy_tag=$(git describe --exact-match HEAD)" >> $GITHUB_OUTPUT
+                  else
+                    echo "deploy_tag=FAILED" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Deploy to Factorio Mod Portal
+              if: steps.get-tag.outputs.deploy_tag != 'FAILED'
+              uses: mchangrh/factorio-mod-upload@v1
+              with:
+                  mod-name: GhostScanner4
+              env:
+                  FACTORIO_MODS_TOKEN: ${{ secrets.FACTORIO_MOD_PORTAL_KEY }}
+                  FILENAME: ${{ steps.get-zip.outputs.zip_path }}
