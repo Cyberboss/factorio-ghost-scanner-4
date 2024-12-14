@@ -1,11 +1,16 @@
 ---------------------------------------------------------------------------------------------------
+Version: 4.0.2
+Date: 2024-12-14
+  Fixes:
+    - Fixed missing description for a mod setting
+---------------------------------------------------------------------------------------------------
 Version: 4.0.1
-Date: 2024-12-11
+Date: 2024-12-13
   Fixes:
     - Fixes a count of 1 always being output for each ghost.
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.0
-Date: 2024-12-11
+Date: 2024-12-13
   Changes:
     - Ported to Typescript (Original mod by Tiavor: https://mods.factorio.com/mod/GhostScanner2)
     - Ported to Factorio 2.0
