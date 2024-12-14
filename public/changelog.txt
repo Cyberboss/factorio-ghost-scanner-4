@@ -1,12 +1,13 @@
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.2
 Date: 2024-12-14
-  Fixes:
-    - Fixed missing description for a mod setting
+  Bugfixes:
+    - Fixed missing description for a mod setting.
+    - Fixed missing entity description.
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.1
 Date: 2024-12-13
-  Fixes:
+  Bugfixes:
     - Fixes a count of 1 always being output for each ghost.
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.0
