@@ -10,6 +10,8 @@ Please open an issue if you have a problem.
 
 You'll need a node 22+ environment setup. VSCode is the recommended IDE.
 
+Run `corepack enable` to ensure you're using the correct yarn version.
+
 Run `yarn` to install dependencies like the typescript-to-lua compiler and typed-factorio definitions.
 
 Run `yarn build` to build the mod `.zip` in the `build/` directory.
