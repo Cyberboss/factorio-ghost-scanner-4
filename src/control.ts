@@ -385,12 +385,11 @@ const GetGhostsAsSignals = (
         const uid = e.unit_number || e.position;
         if (
             !foundEntities.has(uid) &&
-            e.to_be_deconstructed() &&
             e.is_registered_for_deconstruction(force) &&
             e.prototype.cliff_explosive_prototype
         ) {
             foundEntities.add(uid);
-            AddSignal(id, e.prototype.cliff_explosive_prototype, 1);
+            AddSignal(id, e.prototype.cliff_explosive_prototype, 1, "normal"); // have to specify a quality here otherwise only a virtual signal gets set
             ++countUniqueEntities;
         }
 
