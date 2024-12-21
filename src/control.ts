@@ -8,6 +8,7 @@ import {
     LuaEntityPrototype,
     LuaForce,
     LuaLogisticCell,
+    LuaQualityPrototype,
     LuaTilePrototype,
     MapPosition,
     OnBuiltEntityEvent,
@@ -285,7 +286,14 @@ const GetItemsToPlace = (prototype: LuaEntityPrototype | LuaTilePrototype) => {
 let signals: GhostsAsSignals | undefined = undefined;
 const AddSignal = (id: UnitNumber, name: string, count: number, quality?: QualityID) => {
     const indexesForID = storage.signalIndexes.get(id)!;
-    let signalIndex = indexesForID.get(name);
+
+    let item_uid = name;
+    if (quality) {
+        const prototype_name = (quality as LuaQualityPrototype).name;
+        item_uid = prototype_name ?? quality;
+    }
+
+    let signalIndex = indexesForID.get(item_uid);
 
     let s: LogisticFilterWrite;
     if (signalIndex && signals![signalIndex]) {
