@@ -182,11 +182,15 @@ const RemoveSensor = (id: UnitNumber) => {
 };
 
 const ClearCombinator = (controlBehavior: LuaConstantCombinatorControlBehavior) => {
-    if (controlBehavior.sections_count != 0) {
+    if (controlBehavior.sections_count != 1) {
         ModLog("Cleaning scanner");
         for (let i = 1; i <= controlBehavior.sections_count; ++i) {
             controlBehavior.remove_section(1);
         }
+
+        controlBehavior.add_section()!.filters = [];
+    } else {
+        controlBehavior.get_section(1)!.filters = [];
     }
 };
 
@@ -230,7 +234,7 @@ const UpdateArea = () => {
                     const signalsForCombinator = storage.scanSignals.get(id);
                     if (signalsForCombinator && signalsForCombinator.length > 0) {
                         ModLog(`Setting filters for scanner ${id}`);
-                        const section = controlBehavior.add_section()!;
+                        const section = controlBehavior.get_section(1)!;
                         section.filters = signalsForCombinator;
                     } else {
                         ModLog(`No filters for scanner ${id}`);
