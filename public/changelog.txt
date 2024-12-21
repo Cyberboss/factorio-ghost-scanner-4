@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 4.0.4
+Date: 2024-12-21
+  Bugfixes:
+    - Fixed mixed qualities being collapsed into one request
+    - Minor performance improvement with regards to combinator logistics section handling
+---------------------------------------------------------------------------------------------------
 Version: 4.0.3
 Date: 2024-12-14
   Bugfixes:
