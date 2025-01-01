@@ -88,7 +88,7 @@ jobs:
 
             - name: Deploy to Factorio Mod Portal
               if: steps.get-tag.outputs.deploy_tag != 'FAILED'
-              uses: mchangrh/factorio-mod-upload@v1
+              uses: mchangrh/factorio-mod-upload@v2
               with:
                   mod-name: GhostScanner4
               env:
