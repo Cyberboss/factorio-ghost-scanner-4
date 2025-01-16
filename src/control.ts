@@ -208,7 +208,7 @@ const UpdateArea = () => {
         if (cells && cells.cells && cells.cells.length > 0) {
             const force = cells.force;
             for (const cell of cells.cells) {
-                if (num < scanAreasPerTick) {
+                if (num <= scanAreasPerTick) {
                     if (!storage.scanSignals.has(id)) {
                         storage.signalIndexes.delete(id);
                         storage.scanSignals.set(id, GetGhostsAsSignals(id, cell, force, undefined));
