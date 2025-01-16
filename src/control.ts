@@ -68,8 +68,8 @@ declare const storage: Storage;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ModLog = (message: string) => {
     // uncomment to debug
-    //game.print(message);
-    //log(message);
+    // game.print(message);
+    // log(message);
 };
 
 const ScannerName = "ghost-scanner";
@@ -166,6 +166,7 @@ const OnEntityRemoved = (
 };
 
 const CleanUp = (id: UnitNumber) => {
+    ModLog(`Cleanup ${id}`);
     storage.scanSignals.delete(id);
     storage.signalIndexes.delete(id);
     storage.scanAreas.delete(id);
@@ -203,9 +204,9 @@ const UpdateArea = () => {
 
     let num = 1;
     for (const [id, cells] of storage.scanAreas) {
-        ModLog(`Update scanner ${id}`);
         const tempAreas = [];
         if (cells && cells.cells && cells.cells.length > 0) {
+            ModLog(`Update scanner ${id}: ${cells.cells.length} cells`);
             const force = cells.force;
             for (const cell of cells.cells) {
                 if (num <= scanAreasPerTick) {
@@ -223,6 +224,11 @@ const UpdateArea = () => {
                 }
 
                 ++num;
+            }
+
+            if (tempAreas.length > 0) {
+                storage.scanAreas.get(id)!.cells = [...tempAreas];
+                break;
             }
 
             for (let j = storage.ghostScanners.length - 1; j >= 0; --j) {
@@ -248,11 +254,6 @@ const UpdateArea = () => {
                     ModLog(`Error: Did not find scanner with ID ${id}`);
                     CleanUp(id);
                 }
-            }
-
-            if (tempAreas.length > 0) {
-                storage.scanAreas.get(id)!.cells = [...tempAreas];
-                break;
             }
 
             storage.scanAreas.delete(id);
@@ -570,14 +571,16 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
         );
 
         if (!logisticNetwork) {
-            ModLog("Combinator has no logi-network!");
+            ModLog(
+                `Combinator ${ghostScanner.id} has no logi-network @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}!`
+            );
             ClearCombinator(controlBehavior);
             CleanUp(ghostScanner.id);
             return;
         }
 
         ModLog(
-            `Adding loginet ID ${logisticNetwork.network_id} from combinator ${ghostScanner.id}`
+            `Adding loginet ID ${logisticNetwork.network_id} from combinator ${ghostScanner.id} @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}`
         );
 
         storage.scanSignals.delete(ghostScanner.id);
