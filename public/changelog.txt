@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 4.0.5
+Date: 2025-01-15
+  Bugfixes:
+    - Fixed an off by one error with "Scanned areas per tick" setting
+    - Fixed incomplete scan results being pushed to combinators, resulting in signals "flickering"
+---------------------------------------------------------------------------------------------------
 Version: 4.0.4
 Date: 2024-12-21
   Bugfixes:
