@@ -19,7 +19,7 @@
         "rimraf": "^6.0.1",
         "typed-factorio": "^3.12.0",
         "typescript": "^5.7.2",
-        "typescript-eslint": "^8.21.0",
+        "typescript-eslint": "^8.22.0",
         "typescript-to-lua": "^1.29.1"
     },
     "devDependencies": {
