@@ -20,7 +20,7 @@
         "typed-factorio": "^3.13.1",
         "typescript": "^5.7.2",
         "typescript-eslint": "^8.23.0",
-        "typescript-to-lua": "^1.29.1"
+        "typescript-to-lua": "^1.30.0"
     },
     "devDependencies": {
         "@types/copyfiles": "^2"
