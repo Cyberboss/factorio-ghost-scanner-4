@@ -636,10 +636,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chalk@npm:~5.3":
-  version: 5.3.0
-  resolution: "chalk@npm:5.3.0"
-  checksum: 10c0/8297d436b2c0f95801103ff2ef67268d362021b8210daf8ddbe349695333eb3610a71122172ff3b0272f1ef2cf7cc2c41fdaa4715f52e49ffe04c56340feed09
+"chalk@npm:~5.4":
+  version: 5.4.1
+  resolution: "chalk@npm:5.4.1"
+  checksum: 10c0/b23e88132c702f4855ca6d25cb5538b1114343e41472d5263ee8a37cccfccd9c4216d111e1097c6a27830407a1dc81fecdf2a56f2c63033d4dbbd88c10b0dcef
   languageName: node
   linkType: hard
 
@@ -708,18 +708,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"copy-folder-util@npm:^1.1.4":
-  version: 1.1.4
-  resolution: "copy-folder-util@npm:1.1.4"
+"copy-folder-util@npm:^1.1.5":
+  version: 1.1.5
+  resolution: "copy-folder-util@npm:1.1.5"
   dependencies:
-    chalk: "npm:~5.3"
+    chalk: "npm:~5.4"
     cli-argv-util: "npm:~1.2"
     fancy-log: "npm:~2.0"
     slash: "npm:~5.1"
   bin:
     copy-folder: bin/cli.js
     copy-folder-util: bin/cli.js
-  checksum: 10c0/1bce63ac53a5fce38a87596e091ce2543371f4ece08ca5671ffc23134514e00dcb2046af97693a1f084ee51c2ac5d54d0b2a6f8e36433c285847e0bd2597e48e
+  checksum: 10c0/2b28e8e22e8dbc06f7a2bce717d44af2b6a1682c135a4c55af0928a6a2128c51bdb1064bf47047a44835633efe239cb3756b48b4248c7e545e128d6830f1c109
   languageName: node
   linkType: hard
 
@@ -2504,7 +2504,7 @@ __metadata:
     "@eslint/js": "npm:^9.21.0"
     "@types/copyfiles": "npm:^2"
     archiver: "npm:^7.0.1"
-    copy-folder-util: "npm:^1.1.4"
+    copy-folder-util: "npm:^1.1.5"
     copyfiles: "npm:^2.4.1"
     eslint: "npm:^9.21.0"
     eslint-plugin-import: "npm:^2.31.0"
