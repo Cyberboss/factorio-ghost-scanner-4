@@ -2529,7 +2529,7 @@ __metadata:
     typed-factorio: "npm:^3.16.0"
     typescript: "npm:^5.7.2"
     typescript-eslint: "npm:^8.26.1"
-    typescript-to-lua: "npm:^1.30.1"
+    typescript-to-lua: "npm:^1.31.0"
   languageName: unknown
   linkType: soft
 
@@ -2969,9 +2969,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript-to-lua@npm:^1.30.1":
-  version: 1.30.1
-  resolution: "typescript-to-lua@npm:1.30.1"
+"typescript-to-lua@npm:^1.31.0":
+  version: 1.31.0
+  resolution: "typescript-to-lua@npm:1.31.0"
   dependencies:
     "@typescript-to-lua/language-extensions": "npm:1.19.0"
     enhanced-resolve: "npm:5.8.2"
@@ -2979,10 +2979,10 @@ __metadata:
     resolve: "npm:^1.15.1"
     source-map: "npm:^0.7.3"
   peerDependencies:
-    typescript: 5.7.2
+    typescript: 5.8.2
   bin:
     tstl: dist/tstl.js
-  checksum: 10c0/90bd7b05fa879fbe3c8ebf713b20b61fd11158f12c28712393314a7935e2b61f0212167b3941087f6c0fb261091868b7839ebfd54b76b4e0062018ac4e6fe6b4
+  checksum: 10c0/41b434aa19bdcbc0097ff1b480b50aeb1b11fd8dca1bfed8dce7db88278237686be415ae2deebd89c0a4089cdc0b5fe8400235fa70520090fc7c5e3ab859f364
   languageName: node
   linkType: hard
 
