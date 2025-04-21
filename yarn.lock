@@ -2526,7 +2526,7 @@ __metadata:
     lua-types: "npm:^2.13.1"
     prettier: "npm:^3.5.3"
     rimraf: "npm:^6.0.1"
-    typed-factorio: "npm:^3.17.0"
+    typed-factorio: "npm:^3.20.0"
     typescript: "npm:^5.8.2"
     typescript-eslint: "npm:^8.27.0"
     typescript-to-lua: "npm:^1.31.0"
@@ -2945,13 +2945,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typed-factorio@npm:^3.17.0":
-  version: 3.17.0
-  resolution: "typed-factorio@npm:3.17.0"
+"typed-factorio@npm:^3.20.0":
+  version: 3.20.0
+  resolution: "typed-factorio@npm:3.20.0"
   peerDependencies:
     lua-types: ^2.13.1
     typescript-to-lua: ^1.10.0
-  checksum: 10c0/d96cd56c7238ac0ef66ce01c590944c8583517a4461de19621bbb3aa51a06d13b721fe3063ed6a37b79890ce03e86ef175cf767d6d806a0b0bb21d6d0e0e8ce9
+  checksum: 10c0/50f9b6ac764f846e94677e9308d5013bd0c4cf8ddb36a325acba820f58179ee7b29ac219b121cef2cedfa1accdbcffef60cf112d4e1052133e346c05e4a9fbd3
   languageName: node
   linkType: hard
 
