@@ -10,7 +10,7 @@
     "dependencies": {
         "@eslint/js": "^9.22.0",
         "archiver": "^7.0.1",
-        "copy-folder-util": "^1.1.5",
+        "copy-folder-util": "^1.1.6",
         "copyfiles": "^2.4.1",
         "eslint": "^9.24.0",
         "eslint-plugin-import": "^2.31.0",
