@@ -16,7 +16,7 @@
         "eslint-plugin-import": "^2.31.0",
         "lua-types": "^2.13.1",
         "prettier": "^3.5.3",
-        "rimraf": "^6.0.1",
+        "rimraf": "^6.1.0",
         "typed-factorio": "^3.17.0",
         "typescript": "^5.8.2",
         "typescript-eslint": "^8.27.0",
