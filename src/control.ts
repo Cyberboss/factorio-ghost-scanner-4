@@ -492,7 +492,7 @@ const GetGhostsAsSignals = (
         });
         countUniqueEntities = 0;
         for (const e of entities) {
-            const uid = script.register_on_object_destroyed(e);
+            const uid = script.register_on_object_destroyed(e)[0] as UnitNumber; // abuse on_entity_destroyed to generate ids directly for proxies
             if (!foundEntities.has(uid)) {
                 foundEntities.add(uid);
                 for (const requestItem of e.item_requests) {
