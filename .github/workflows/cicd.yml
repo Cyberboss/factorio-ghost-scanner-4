@@ -70,7 +70,7 @@ jobs:
                   subject-path: ${{ steps.get-zip.outputs.zip_path }}
 
             - name: Upload Artifact
-              uses: actions/upload-artifact@v5
+              uses: actions/upload-artifact@v6
               with:
                   name: mod-build
                   path: ${{ steps.get-zip.outputs.zip_path }}
