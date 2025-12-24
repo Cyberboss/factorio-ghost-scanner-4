@@ -792,9 +792,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"copy-folder-util@npm:^1.2.1":
-  version: 1.2.1
-  resolution: "copy-folder-util@npm:1.2.1"
+"copy-folder-util@npm:^1.2.2":
+  version: 1.2.2
+  resolution: "copy-folder-util@npm:1.2.2"
   dependencies:
     chalk: "npm:~5.6"
     cli-argv-util: "npm:~1.4"
@@ -803,7 +803,7 @@ __metadata:
   bin:
     copy-folder: bin/cli.js
     copy-folder-util: bin/cli.js
-  checksum: 10c0/77b5fa5c6cbda3c4321b3fabae8b7199da40f9e493788f9ec8312c6a6011f2e4b74b456b22c33d963fd5690dc21cc07a860f4df447a7e291ebbc5f78b3dd2572
+  checksum: 10c0/8d568d1aa471c9da46947dff8e6111fe7122955e68195bd9b2c737816cd61e6f3c5492d0911abe9bdb312d0f5cce35ff78270843903ddf9b6dd235a1837b1a79
   languageName: node
   linkType: hard
 
@@ -2943,7 +2943,7 @@ __metadata:
     "@eslint/js": "npm:^9.39.2"
     "@types/copyfiles": "npm:^2"
     archiver: "npm:^7.0.1"
-    copy-folder-util: "npm:^1.2.1"
+    copy-folder-util: "npm:^1.2.2"
     copyfiles: "npm:^2.4.1"
     eslint: "npm:^9.39.2"
     eslint-plugin-import: "npm:^2.32.0"
