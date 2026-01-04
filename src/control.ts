@@ -528,7 +528,7 @@ const GetGhostsAsSignals = (
                     for (const itemStack of storage.lookupItemsToPlaceThis?.get(
                         upgradePrototype.name
                     ) || GetItemsToPlace(upgradePrototype)) {
-                        const itemStackCount = itemStack.count!;
+                        const itemStackCount = itemStack.count ?? 1;
                         AddSignal(id, itemStack.name, itemStackCount, upgradeTarget[1]);
                         countUniqueEntities += itemStackCount;
                     }
@@ -556,7 +556,7 @@ const GetGhostsAsSignals = (
                     foundEntities.add(uid);
                     for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
                         GetItemsToPlace(e.ghost_prototype)) {
-                        const itemStackCount = itemStack.count!;
+                        const itemStackCount = itemStack.count ?? 1;
                         AddSignal(id, itemStack.name, itemStackCount, e.quality);
                         countUniqueEntities -= itemStackCount;
                     }
@@ -603,6 +603,7 @@ const GetGhostsAsSignals = (
         }
     }
 
+    // Search for tile ghosts (e.g., concrete, space-platform-foundation)
     if (!maxResults || resultLimit! > 0) {
         entities = searchArea.surface.find_entities_filtered({
             area: searchArea.innerBounds,
@@ -618,8 +619,9 @@ const GetGhostsAsSignals = (
                 foundEntities.add(uid);
                 for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
                     GetItemsToPlace(e.ghost_prototype)) {
-                    const count = itemStack.count!;
-                    AddSignal(id, itemStack.name, count, itemStack.quality);
+                    const count = itemStack.count ?? 1;
+                    // Use entity quality, not itemStack quality (itemStack.quality is typically undefined)
+                    AddSignal(id, itemStack.name, count, e.quality);
                     countUniqueEntities -= count;
                 }
             }
@@ -726,7 +728,7 @@ const GetGhostsAsSignalsForSpacePlatform = (
                 for (const itemStack of storage.lookupItemsToPlaceThis?.get(
                     upgradePrototype.name
                 ) || GetItemsToPlace(upgradePrototype)) {
-                    const itemStackCount = itemStack.count!;
+                    const itemStackCount = itemStack.count ?? 1;
                     AddSignal(id, itemStack.name, itemStackCount, upgradeTarget[1]);
                     countUniqueEntities += itemStackCount;
                 }
@@ -752,7 +754,7 @@ const GetGhostsAsSignalsForSpacePlatform = (
                 foundEntities.add(uid);
                 for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
                     GetItemsToPlace(e.ghost_prototype)) {
-                    const itemStackCount = itemStack.count!;
+                    const itemStackCount = itemStack.count ?? 1;
                     AddSignal(id, itemStack.name, itemStackCount, e.quality);
                     countUniqueEntities -= itemStackCount;
                 }
@@ -798,7 +800,7 @@ const GetGhostsAsSignalsForSpacePlatform = (
         }
     }
 
-    // Search for tile ghosts
+    // Search for tile ghosts (including space-platform-foundation)
     if (!maxResults || resultLimit! > 0) {
         entities = surface.find_entities_filtered({
             limit: resultLimit,
@@ -813,8 +815,9 @@ const GetGhostsAsSignalsForSpacePlatform = (
                 foundEntities.add(uid);
                 for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
                     GetItemsToPlace(e.ghost_prototype)) {
-                    const count = itemStack.count!;
-                    AddSignal(id, itemStack.name, count, itemStack.quality);
+                    const count = itemStack.count ?? 1;
+                    // Use entity quality, not itemStack quality (itemStack.quality is typically undefined)
+                    AddSignal(id, itemStack.name, count, e.quality);
                     countUniqueEntities -= count;
                 }
             }
