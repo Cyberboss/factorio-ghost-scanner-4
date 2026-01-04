@@ -243,15 +243,27 @@ const UpdateArea = () => {
         if ((scanArea as SpacePlatformScanArea).isSpacePlatform) {
             const spacePlatformArea = scanArea as SpacePlatformScanArea;
             ModLog(`Update scanner ${id} on space platform`);
-            
+
             // For space platforms, scan the entire surface at once
             if (!storage.scanSignals.has(id)) {
                 storage.signalIndexes.delete(id);
-                storage.scanSignals.set(id, GetGhostsAsSignalsForSpacePlatform(id, spacePlatformArea.surface, spacePlatformArea.force));
+                storage.scanSignals.set(
+                    id,
+                    GetGhostsAsSignalsForSpacePlatform(
+                        id,
+                        spacePlatformArea.surface,
+                        spacePlatformArea.force
+                    )
+                );
             } else {
                 storage.scanSignals.set(
                     id,
-                    GetGhostsAsSignalsForSpacePlatform(id, spacePlatformArea.surface, spacePlatformArea.force, storage.scanSignals.get(id))
+                    GetGhostsAsSignalsForSpacePlatform(
+                        id,
+                        spacePlatformArea.surface,
+                        spacePlatformArea.force,
+                        storage.scanSignals.get(id)
+                    )
                 );
             }
 
@@ -311,7 +323,7 @@ const UpdateArea = () => {
             }
 
             if (tempAreas.length > 0) {
-                storage.scanAreas.get(id)!.cells = [...tempAreas];
+                (storage.scanAreas.get(id)! as ScanArea).cells = [...tempAreas];
                 break;
             }
 
@@ -847,7 +859,7 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
 
     if (!storage.scanAreas.has(ghostScanner.id)) {
         const surface = ghostScanner.entity.surface;
-        
+
         // Check if this scanner is on a space platform
         const platform = surface.platform;
         if (platform && platform.valid) {
@@ -926,10 +938,10 @@ const InitEvents = () => {
     script.on_event(defines.events.on_robot_built_entity, OnEntityCreated);
     script.on_event(defines.events.script_raised_built, OnEntityCreated);
     script.on_event(defines.events.script_raised_revive, OnEntityCreated);
-    
+
     // Space platform entity events
     script.on_event(defines.events.on_space_platform_built_entity, OnSpacePlatformEntityCreated);
-    
+
     UpdateEventHandlers();
 };
 
@@ -961,12 +973,12 @@ function UpdateEventHandlers() {
     if (entityCount > 0) {
         script.on_event(defines.events.on_tick, OnTick);
         script.on_nth_tick(math.floor(updateInterval + 1), OnNthTick);
-        
+
         // Regular surface entity removal events
         script.on_event(defines.events.on_pre_player_mined_item, OnEntityRemoved);
         script.on_event(defines.events.on_robot_pre_mined, OnEntityRemoved);
         script.on_event(defines.events.on_entity_died, OnEntityRemoved);
-        
+
         // Space platform entity removal event
         script.on_event(defines.events.on_space_platform_pre_mined, OnSpacePlatformEntityRemoved);
     } else {
