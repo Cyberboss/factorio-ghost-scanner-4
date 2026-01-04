@@ -13,6 +13,5 @@
 .pnp.*
 node_modules/**
 build/**
-.vscode/**
 
 *.lua
