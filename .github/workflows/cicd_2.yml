@@ -83,29 +83,32 @@ jobs:
                   set +ea
                   git describe --exact-match HEAD
                   if [ $? -eq 0 ]; then
-                    echo "deploy_tag=$(git describe --exact-match HEAD)" >> $GITHUB_OUTPUT
+                    TAG=$(git describe --exact-match HEAD)
+                    echo "deploy_tag=$TAG" >> $GITHUB_OUTPUT
+                    echo "release_name=$TAG" >> $GITHUB_OUTPUT
+                    echo "is_prerelease=false" >> $GITHUB_OUTPUT
                   else
-                    echo "deploy_tag=FAILED" >> $GITHUB_OUTPUT
+                    # No Tag - New Release for Testing Branch
+                    BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | sed 's/\//-/g')
+                    SHORT_SHA=$(git rev-parse --short HEAD)
+                    RELEASE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+                    echo "deploy_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+                    echo "release_name=Test Build ${BRANCH_NAME} (${SHORT_SHA})" >> $GITHUB_OUTPUT
+                    echo "is_prerelease=true" >> $GITHUB_OUTPUT
                   fi
 
             - name: Create GitHub Release
               id: create_release
-              if: steps.get-tag.outputs.deploy_tag != 'FAILED'
-              uses: actions/create-release@v1
+              uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ steps.get-tag.outputs.deploy_tag }}
-                  release_name: ${{ steps.get-tag.outputs.deploy_tag }}
-                  body: Release ${{ steps.get-tag.outputs.deploy_tag }}
+                  name: ${{ steps.get-tag.outputs.release_name }}
+                  body: |
+                      Automated release from branch ${{ github.ref_name }}
+                      Commit: ${{ github.sha }}
                   draft: false
-                  prerelease: true
+                  prerelease: ${{ steps.get-tag.outputs.is_prerelease }}
+                  files: ${{ steps.get-zip.outputs.zip_path }}
+                  make_latest: ${{ steps.get-tag.outputs.is_prerelease == 'false' }}
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Upload Release Asset
-              if: steps.get-tag.outputs.deploy_tag != 'FAILED'
-              uses: actions/upload-release-asset@v1
-              with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ${{ steps.get-zip.outputs.zip_path }}
-                  asset_name: ${{ steps.get-zip.outputs.zip_path }}
-                  asset_content_type: application/zip
