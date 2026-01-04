@@ -1,0 +1,111 @@
+name: CI Pipeline
+
+on:
+    push:
+        branches:
+            - test_fixes
+    pull_request:
+        branches:
+            - test_fixes
+
+permissions:
+    id-token: write
+    attestations: write
+    contents: write
+
+jobs:
+    build:
+        name: Build and Create Release
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node-version: [23.x]
+        steps:
+            - name: Install Native Dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y expect-dev
+
+            - name: Setup Node ${{ matrix.node-version }}
+              uses: actions/setup-node@v6
+              with:
+                  node-version: ${{ matrix.node-version }}
+
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-tags: true
+
+            - name: Restore node_modules cache
+              uses: actions/cache@v5
+              with:
+                  path: "./node_modules"
+                  key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+
+            - name: Setup Yarn
+              run: corepack enable
+
+            - name: Install Yarn Dependencies
+              run: |
+                  unbuffer yarn install --immutable | tee yarn_output.log
+                  if cat yarn_output.log | grep YN0060; then
+                    echo "Detected incompatible peer dependencies!"
+                    exit 1
+                  fi
+
+            - name: Build
+              run: yarn build
+
+            - name: Run ESLint
+              run: yarn eslint
+
+            - name: Run Prettier
+              run: yarn prettier -c .
+
+            - name: Discover Zip Path
+              id: get-zip
+              run: echo "zip_path=$(find build -maxdepth 1 -name "*.zip" -print -quit)" >> $GITHUB_OUTPUT
+
+            - name: Generate Artifact Attestation
+              uses: actions/attest-build-provenance@v3
+              with:
+                  subject-path: ${{ steps.get-zip.outputs.zip_path }}
+
+            - name: Upload Artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  name: mod-build
+                  path: ${{ steps.get-zip.outputs.zip_path }}
+
+            - name: Check if version is tagged
+              id: get-tag
+              run: |
+                  set +ea
+                  git describe --exact-match HEAD
+                  if [ $? -eq 0 ]; then
+                    echo "deploy_tag=$(git describe --exact-match HEAD)" >> $GITHUB_OUTPUT
+                  else
+                    echo "deploy_tag=FAILED" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Create GitHub Release
+              id: create_release
+              if: steps.get-tag.outputs.deploy_tag != 'FAILED'
+              uses: actions/create-release@v1
+              with:
+                  tag_name: ${{ steps.get-tag.outputs.deploy_tag }}
+                  release_name: ${{ steps.get-tag.outputs.deploy_tag }}
+                  body: Release ${{ steps.get-tag.outputs.deploy_tag }}
+                  draft: false
+                  prerelease: true
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload Release Asset
+              if: steps.get-tag.outputs.deploy_tag != 'FAILED'
+              uses: actions/upload-release-asset@v1
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ${{ steps.get-zip.outputs.zip_path }}
+                  asset_name: ${{ steps.get-zip.outputs.zip_path }}
+                  asset_content_type: application/zip
