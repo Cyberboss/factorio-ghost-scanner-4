@@ -857,28 +857,32 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
         return;
     }
 
-    if (!storage.scanAreas.has(ghostScanner.id)) {
-        const surface = ghostScanner.entity.surface;
+    const surface = ghostScanner.entity.surface;
+    const scannerID = ghostScanner.id;
 
-        // Check if this scanner is on a space platform
-        const platform = surface.platform;
-        if (platform && platform.valid) {
-            // Scanner is on a space platform - scan entire platform surface
+    // Check if this scanner is on a space platform
+    const platform = surface.platform;
+    if (platform && platform.valid) {
+        // For space platforms, always ensure scan area exists as it gets deleted after each scan
+        if (!storage.scanAreas.has(scannerID)) {
             ModLog(
-                `Adding space platform "${platform.name}" scan for combinator ${ghostScanner.id} @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}`
+                `Adding space platform "${platform.name}" scan for combinator ${scannerID} @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}`
             );
-
-            storage.scanSignals.delete(ghostScanner.id);
-            storage.signalIndexes.delete(ghostScanner.id);
-            storage.foundEntities.delete(ghostScanner.id);
-            storage.scanAreas.set(ghostScanner.id, {
-                surface: surface,
-                force: ghostScanner.entity.force,
-                isSpacePlatform: true
-            } as SpacePlatformScanArea);
-            return;
         }
 
+        storage.scanSignals.delete(scannerID);
+        storage.signalIndexes.delete(scannerID);
+        storage.foundEntities.delete(scannerID);
+        storage.scanAreas.set(scannerID, {
+            surface: surface,
+            force: ghostScanner.entity.force,
+            isSpacePlatform: true
+        } as SpacePlatformScanArea);
+        return;
+    }
+
+    // Regular surface - only setup if not already configured
+    if (!storage.scanAreas.has(scannerID)) {
         // Regular surface - try to find logistic network
         const logisticNetwork = surface.find_logistic_network_by_position(
             ghostScanner.entity.position,
@@ -887,21 +891,21 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
 
         if (!logisticNetwork) {
             ModLog(
-                `Combinator ${ghostScanner.id} has no logi-network @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}!`
+                `Combinator ${scannerID} has no logi-network @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}!`
             );
             ClearCombinator(controlBehavior);
-            CleanUp(ghostScanner.id);
+            CleanUp(scannerID);
             return;
         }
 
         ModLog(
-            `Adding loginet ID ${logisticNetwork.network_id} from combinator ${ghostScanner.id} @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}`
+            `Adding loginet ID ${logisticNetwork.network_id} from combinator ${scannerID} @${ghostScanner.entity.position.x}/${ghostScanner.entity.position.y}:${ghostScanner.entity.force.name}`
         );
 
-        storage.scanSignals.delete(ghostScanner.id);
-        storage.signalIndexes.delete(ghostScanner.id);
-        storage.foundEntities.delete(ghostScanner.id);
-        storage.scanAreas.set(ghostScanner.id, {
+        storage.scanSignals.delete(scannerID);
+        storage.signalIndexes.delete(scannerID);
+        storage.foundEntities.delete(scannerID);
+        storage.scanAreas.set(scannerID, {
             cells: [...logisticNetwork.cells],
             force: logisticNetwork.force
         });
