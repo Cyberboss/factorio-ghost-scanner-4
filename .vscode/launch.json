@@ -1,0 +1,46 @@
+// Launch-Optionen f https://marketplace.visualstudio.com/items?itemName=justarandomgeek.factoriomod-debug
+
+
+{
+  "version": "0.2.0",
+  "configurations": [
+{
+  "type": "factoriomod",
+  "request": "launch",
+  "name": "Factorio Mod Debug - Prelaunch Task Startup 3",
+  "runtimeExecutable": "D:\\Steam\\steamapps\\common\\Factorio\\bin\\x64\\factorio.exe",
+  "modsPath": "C:\\Users\\Shadow\\Desktop\\Factorio_Mods\\Startup_3",
+  //"preLaunchTask": "Deploy Mod (Create ZIP)",
+  "ModName": "ImmersiveColonyBuilderFork",
+  "factorioArgs": [
+    "--load-game", "Test-Mod-1-3.zip"
+  ]
+},
+{
+  "type": "factoriomod",
+  "request": "launch",
+  "name": "Factorio Mod - Prelaunch Task Startup 2",
+  "runtimeExecutable": "D:\\Steam\\steamapps\\common\\Factorio\\bin\\x64\\factorio.exe",
+  "modsPath": "C:\\Users\\Shadow\\Desktop\\Factorio_Mods\\Startup_2",
+  "preLaunchTask": "Deploy Mod (Create ZIP)",
+  "ModName": "ImmersiveColonyBuilderFork",
+  "factorioArgs": [
+   // "--load-game", "Test-Mod-1.zip"
+  ]
+},
+{
+  "type": "factoriomod",
+  "request": "launch",
+  "name": "Factorio Mod - Prelaunch Task Startup 4",
+  "runtimeExecutable": "D:\\Steam\\steamapps\\common\\Factorio\\bin\\x64\\factorio.exe",
+  "modsPath": "C:\\Users\\Shadow\\Desktop\\Factorio_Mods\\Startup_4",
+  "preLaunchTask": "Deploy Mod (Create ZIP)",
+  "ModName": "ImmersiveColonyBuilderFork",
+  "factorioArgs": [
+   // "--load-game", "Test-Mod-1.zip"
+  ]
+}
+
+  ]
+}
+
