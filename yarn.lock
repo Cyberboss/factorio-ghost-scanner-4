@@ -2440,10 +2440,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lua-types@npm:^2.13.1":
-  version: 2.13.1
-  resolution: "lua-types@npm:2.13.1"
-  checksum: 10c0/c39e0800f35422dcc878c030fe3c320de4dd57486162b30ccbf7006e44606dc0f7e6fc986695c9329170f02feb1b56daf80e9fc15e63c2dc3f9959f3460e7c1a
+"lua-types@npm:^2.14.1":
+  version: 2.14.1
+  resolution: "lua-types@npm:2.14.1"
+  checksum: 10c0/16e1f578389a6fc1b9fcc16eac9160c8722ab5dea82cef5ccdb2790e1e78564ebe32d4498080a79ca64b17d7963becacbef7c3b91d077e554dc0f1c034791f42
   languageName: node
   linkType: hard
 
@@ -2977,7 +2977,7 @@ __metadata:
     copyfiles: "npm:^2.4.1"
     eslint: "npm:^9.39.2"
     eslint-plugin-import: "npm:^2.32.0"
-    lua-types: "npm:^2.13.1"
+    lua-types: "npm:^2.14.1"
     prettier: "npm:^3.8.1"
     rimraf: "npm:^6.1.2"
     typed-factorio: "npm:^3.33.0"
