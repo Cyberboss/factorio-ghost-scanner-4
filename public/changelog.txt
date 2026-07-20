@@ -1,12 +1,10 @@
 ---------------------------------------------------------------------------------------------------
 Version: 4.1.0
 Date: 2026-07-19
-
 Bugfixes:
     - Use default count for item stacks when undefined
     - space-platform-foundation on space platforms will now be correctly detected and counted
-    concrete and other terrain tiles on planets within logistics networks will be correctly detected and c
-ounted
+    - Concrete and other terrain tiles on planets within logistics networks will be correctly detected and counted
     - The quality of the tile ghost entity is properly preserved in the signal output
 Changes:
     - Refactor ghostScanner ID usage for consistency
