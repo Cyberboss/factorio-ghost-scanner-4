@@ -4,7 +4,8 @@
     "scripts": {
         "build": "rimraf build && copy-folder public build && copy-folder locale build/locale && tstl -p src/tsconfig.json && copy-folder src build && git clean -fxd src/**/*.lua && git clean -fxd build/**/*.ts && node package.js",
         "install_mod": "yarn build && copyfiles -f build/*.zip ~/AppData/Roaming/Factorio/mods",
-        "lint": "eslint && prettier -c ."
+        "lint": "biome check .",
+        "lint:fix": "biome check --write ."
     },
     "packageManager": "yarn@4.12.0",
     "dependencies": {

@@ -1,0 +1,110 @@
+name: Build Mod
+
+on:
+    push:
+        tags: ["v*"] # <-- Triggers the release when you push a version tag
+    workflow_dispatch: {}
+
+jobs:
+    build:
+        name: Build and Deploy
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node-version: [23.x]
+        permissions:
+            id-token: write
+            attestations: write
+            contents: write # Required to successfully create a GitHub Release
+        steps:
+            - name: Install Native Dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y expect-dev
+
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  fetch-tags: true
+
+            # High-performance formatting and lint checking via Biome (Rust-compiled)
+            - name: Setup Biome CLI
+              uses: biomejs/setup-biome@v2
+              with:
+                  version: latest
+
+            - name: Run Biome Checks
+              run: biome ci .
+
+            - name: Setup Node
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+
+            - name: Restore node_modules cache
+              uses: actions/cache@v5
+              with:
+                  path: "./node_modules"
+                  key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+
+            - name: Setup Yarn
+              run: corepack enable
+
+            - name: Install Yarn Dependencies
+              run: |
+                  unbuffer yarn install --immutable | tee yarn_output.log
+                  if cat yarn_output.log | grep YN0060; then
+                    echo "Detected incompatible peer dependencies!"
+                    exit 1
+                  fi
+
+            - name: Build
+              run: yarn build
+
+            # Dynamically tracks down the exact zip file path created by package.js
+            - name: Discover Zip Path
+              id: get-zip
+              run: |
+                  ZIP_PATH=$(find build -maxdepth 1 -name "*.zip" -print -quit)
+                  if [ -z "$ZIP_PATH" ]; then
+                    echo "❌ Error: package.js failed to generate a .zip file in build/"
+                    exit 1
+                  fi
+                  ZIP_NAME=$(basename "$ZIP_PATH")
+                  echo "Found generated bundle: $ZIP_NAME"
+                  echo "zip_path=$ZIP_PATH" >> $GITHUB_OUTPUT
+                  echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+
+            - name: Generate Artifact Attestation
+              uses: actions/attest-build-provenance@v3
+              with:
+                  subject-path: ${{ steps.get-zip.outputs.zip_path }}
+
+            - name: Upload Artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  name: mod-build
+                  path: ${{ steps.get-zip.outputs.zip_path }}
+
+            # Identifies the release target tag cleanly across manual runs and tag pushes
+            - name: Determine release tag
+              id: release_tag
+              run: |
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                    # Strips the file extension to isolate package name, then grabs everything after the last underscore
+                    VERSION_RAW=$(echo "${{ steps.get-zip.outputs.zip_name }}" | sed 's/\.zip$//' | awk -F'_' '{print $NF}')
+                    release_tag="v${VERSION_RAW}"
+                    echo "ℹ️ Manual run — inferred version from bundle: $release_tag"
+                  else
+                    release_tag="${GITHUB_REF#refs/tags/}"
+                  fi
+                  echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+            # Creates the GitHub release using the natural yarn built asset bundle
+            - name: Create Release
+              if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.release_tag.outputs.release_tag }}
+                  files: ${{ steps.get-zip.outputs.zip_path }}
+                  generate_release_notes: true
