@@ -1,6 +1,7 @@
-import { by_pixel, table } from "util";
+import type { Sprite4Way } from "factorio:prototype";
 
-import { Sprite4Way } from "factorio:prototype";
+// eslint-disable-next-line import/order
+import { by_pixel, table } from "util";
 
 const layers = {
     layers: [

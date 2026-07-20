@@ -1,4 +1,4 @@
-import {
+import type {
     BoundingBox,
     ComparatorString,
     ItemStackDefinition,
@@ -25,8 +25,8 @@ import {
     ScriptRaisedReviveEvent,
     SignalFilter,
     SignalIDType,
-    uint64,
-    UnitNumber
+    UnitNumber,
+    uint64
 } from "factorio:runtime";
 
 import {
@@ -76,7 +76,7 @@ interface Storage {
 declare const storage: Storage;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const ModLog = (message: string) => {
+const ModLog = (_message: string) => {
     // uncomment to debug
     // game.print(message);
     // log(message);
@@ -89,7 +89,7 @@ let updateInterval = settings.global[UpdateIntervalSetting].value as number;
 let scanAreasDelay = settings.global[ScanAreasDelaySetting].value as number;
 let maxResults: number | undefined = settings.global[MaxResultsSetting].value as number;
 
-if (maxResults == 0) {
+if (maxResults === 0) {
     maxResults = undefined;
 }
 
@@ -114,7 +114,7 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
         case MaxResultsSetting: {
             maxResults = settings.global[MaxResultsSetting].value as number;
 
-            if (maxResults == 0) {
+            if (maxResults === 0) {
                 maxResults = undefined;
             }
 
@@ -152,7 +152,7 @@ const OnEntityCreated = (
         | ScriptRaisedReviveEvent
 ) => {
     const entity = event.entity;
-    if (entity.valid && entity.name == ScannerName) {
+    if (entity.valid && entity.name === ScannerName) {
         ModLog("Found new ghost scanner");
 
         entity.operable = false;
@@ -170,7 +170,7 @@ const OnEntityRemoved = (
     event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent
 ) => {
     const entity = event.entity;
-    if (entity.name == ScannerName) {
+    if (entity.name === ScannerName) {
         RemoveSensor(entity.unit_number!);
     }
 };
@@ -178,7 +178,7 @@ const OnEntityRemoved = (
 // Handler for entity built on space platform
 const OnSpacePlatformEntityCreated = (event: OnSpacePlatformBuiltEntityEvent) => {
     const entity = event.entity;
-    if (entity.valid && entity.name == ScannerName) {
+    if (entity.valid && entity.name === ScannerName) {
         ModLog("Found new ghost scanner on space platform");
 
         entity.operable = false;
@@ -195,7 +195,7 @@ const OnSpacePlatformEntityCreated = (event: OnSpacePlatformBuiltEntityEvent) =>
 // Handler for entity removal on space platform
 const OnSpacePlatformEntityRemoved = (event: OnSpacePlatformPreMinedEvent) => {
     const entity = event.entity;
-    if (entity.name == ScannerName) {
+    if (entity.name === ScannerName) {
         RemoveSensor(entity.unit_number!);
     }
 };
@@ -209,7 +209,7 @@ const CleanUp = (id: UnitNumber) => {
 };
 
 const RemoveSensor = (id: UnitNumber) => {
-    const index = storage.ghostScanners.findIndex(scanner => scanner.id == id);
+    const index = storage.ghostScanners.findIndex(scanner => scanner.id === id);
     if (index > -1) {
         storage.ghostScanners.splice(index, 1);
     }
@@ -219,7 +219,7 @@ const RemoveSensor = (id: UnitNumber) => {
 };
 
 const ClearCombinator = (controlBehavior: LuaConstantCombinatorControlBehavior) => {
-    if (controlBehavior.sections_count != 1) {
+    if (controlBehavior.sections_count !== 1) {
         ModLog("Cleaning scanner");
         for (let i = 1; i <= controlBehavior.sections_count; ++i) {
             controlBehavior.remove_section(1);
@@ -270,7 +270,7 @@ const UpdateArea = () => {
             // Update the combinator with results
             for (let j = storage.ghostScanners.length - 1; j >= 0; --j) {
                 const ghostScanner = storage.ghostScanners[j];
-                if (id == ghostScanner.id) {
+                if (id === ghostScanner.id) {
                     const controlBehavior =
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
 
@@ -287,7 +287,7 @@ const UpdateArea = () => {
                     break;
                 }
 
-                if (j == 0) {
+                if (j === 0) {
                     ModLog(`Error: Did not find scanner with ID ${id}`);
                     CleanUp(id);
                 }
@@ -301,7 +301,7 @@ const UpdateArea = () => {
         // Regular surface handling with logistic cells
         const cells = scanArea as ScanArea;
         const tempAreas = [];
-        if (cells && cells.cells && cells.cells.length > 0) {
+        if (cells?.cells && cells.cells.length > 0) {
             ModLog(`Update scanner ${id}: ${cells.cells.length} cells`);
             const force = cells.force;
             for (const cell of cells.cells) {
@@ -329,7 +329,7 @@ const UpdateArea = () => {
 
             for (let j = storage.ghostScanners.length - 1; j >= 0; --j) {
                 const ghostScanner = storage.ghostScanners[j];
-                if (id == ghostScanner.id) {
+                if (id === ghostScanner.id) {
                     const controlBehavior =
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
 
@@ -346,7 +346,7 @@ const UpdateArea = () => {
                     break;
                 }
 
-                if (j == 0) {
+                if (j === 0) {
                     ModLog(`Error: Did not find scanner with ID ${id}`);
                     CleanUp(id);
                 }
@@ -380,7 +380,7 @@ const GetItemsToPlace = (prototype: LuaEntityPrototype | LuaTilePrototype) => {
     return storage.lookupItemsToPlaceThis.get(prototype.name)!;
 };
 
-let signals: GhostsAsSignals | undefined = undefined;
+let signals: GhostsAsSignals | undefined;
 const AddSignal = (id: UnitNumber, name: string, count: number, quality?: QualityID) => {
     const indexesForID = storage.signalIndexes.get(id)!;
 
@@ -865,7 +865,7 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
 
     // Check if this scanner is on a space platform
     const platform = surface.platform;
-    if (platform && platform.valid) {
+    if (platform?.valid) {
         // For space platforms, always ensure scan area exists as it gets deleted after each scan
         if (!storage.scanAreas.has(scannerID)) {
             ModLog(

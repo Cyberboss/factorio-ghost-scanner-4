@@ -1,7 +1,6 @@
-import Info from "./build/info.json" with { type: "json" };
-
-import * as fs from "fs";
+import * as fs from "node:fs";
 import archiver from "archiver";
+import Info from "./build/info.json" with { type: "json" };
 
 const packageName = `${Info.name}_${Info.version}`;
 
@@ -11,7 +10,7 @@ const archive = archiver("zip", {
     zlib: { level: 9 } // Sets the compression level.
 });
 
-archive.on("warning", function (err) {
+archive.on("warning", err => {
     if (err.code === "ENOENT") {
         // log warning
     } else {
@@ -20,7 +19,7 @@ archive.on("warning", function (err) {
     }
 });
 
-archive.on("error", function (err) {
+archive.on("error", err => {
     throw err;
 });
 
