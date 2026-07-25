@@ -160,7 +160,7 @@ const OnEntityRemoved = (
     event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent
 ) => {
     const entity = event.entity;
-    if (entity.name == ScannerName) {
+    if (entity && entity.valid && entity.name == ScannerName) {
         RemoveSensor(entity.unit_number!);
     }
 };
@@ -234,8 +234,21 @@ const UpdateArea = () => {
             for (let j = storage.ghostScanners.length - 1; j >= 0; --j) {
                 const ghostScanner = storage.ghostScanners[j];
                 if (id == ghostScanner.id) {
+                    if (!ghostScanner.entity || !ghostScanner.entity.valid) {
+                        ModLog(`Error: Scanner ${id} entity no longer valid, dropping`);
+                        storage.ghostScanners.splice(j, 1);
+                        CleanUp(id);
+                        break;
+                    }
+
                     const controlBehavior =
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
+                    if (!controlBehavior) {
+                        ModLog(`Error: Scanner ${id} has no control behavior, dropping`);
+                        storage.ghostScanners.splice(j, 1);
+                        CleanUp(id);
+                        break;
+                    }
 
                     ClearCombinator(controlBehavior);
                     const signalsForCombinator = storage.scanSignals.get(id);
@@ -555,8 +568,25 @@ const GetGhostsAsSignals = (
 };
 
 const UpdateSensor = (ghostScanner: GhostScanner) => {
+    // A scanner can be destroyed without any of the removal events we listen
+    // for firing (a deleted surface, for example), which leaves a stale record
+    // in storage.ghostScanners. Dereferencing it raises "LuaEntity API call
+    // when LuaEntity was invalid", which is not recoverable, so drop it.
+    if (!ghostScanner) {
+        return;
+    }
+    if (!ghostScanner.entity || !ghostScanner.entity.valid) {
+        ModLog("Skipping ghost scanner with an invalid entity");
+        RemoveSensor(ghostScanner.id);
+        return;
+    }
+
     const controlBehavior =
         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
+    if (!controlBehavior) {
+        ModLog("Skipping ghost scanner without a control behavior");
+        return;
+    }
     if (!controlBehavior.enabled) {
         ModLog("Combinator disabled, not updating");
         ClearCombinator(controlBehavior);
