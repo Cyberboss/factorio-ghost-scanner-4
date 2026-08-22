@@ -21,6 +21,7 @@ Date: 2026-08-22
     - Fixed repeats of the same item and quality being emitted as one signal entry
       per ghost instead of being summed into a single entry
     - Fixed cliff explosives being counted once per roboport covering the cliff
+    - Fixed a crash on the tick after another mod removed a Ghost Scanner by script
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.6
 Date: 2025-11-30

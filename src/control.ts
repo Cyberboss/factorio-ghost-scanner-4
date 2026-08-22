@@ -21,6 +21,7 @@ import {
     OnTickEvent,
     QualityID,
     ScriptRaisedBuiltEvent,
+    ScriptRaisedDestroyEvent,
     ScriptRaisedReviveEvent,
     SignalFilter,
     SignalIDType,
@@ -305,6 +306,23 @@ const ApplyLogisticGroup = (ghostScanner: GhostScanner, section: LuaLogisticSect
     storage.logisticGroups.set(id, name);
 };
 
+// Used when the scanner is already gone and its force can no longer be read from it.
+// Dropping the name from every force is safe: DropUnusedLogisticGroup keeps any group
+// another scanner still publishes into.
+const ForgetLogisticGroup = (id: UnitNumber) => {
+    const name = storage.logisticGroups.get(id);
+    if (name == undefined) {
+        return;
+    }
+
+    for (const [, force] of game.forces) {
+        DropUnusedLogisticGroup(force, name);
+    }
+
+    storage.logisticGroups.delete(id);
+    storage.pinnedGroups.delete(id);
+};
+
 const DeleteLogisticGroup = (force: LuaForce, id: UnitNumber) => {
     force.delete_logistic_group(storage.logisticGroups.get(id) ?? DefaultLogisticGroupName(id));
     storage.logisticGroups.delete(id);
@@ -378,7 +396,11 @@ const OnEntityCreated = (
 };
 
 const OnEntityRemoved = (
-    event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent
+    event:
+        | OnPrePlayerMinedItemEvent
+        | OnRobotPreMinedEvent
+        | OnEntityDiedEvent
+        | ScriptRaisedDestroyEvent
 ) => {
     const entity = event.entity;
     if (entity.name == ScannerName) {
@@ -460,6 +482,12 @@ const UpdateArea = () => {
             for (let j = storage.ghostScanners.length - 1; j >= 0; --j) {
                 const ghostScanner = storage.ghostScanners[j];
                 if (id == ghostScanner.id) {
+                    if (!ghostScanner.entity.valid) {
+                        ForgetLogisticGroup(id);
+                        RemoveSensor(id);
+                        break;
+                    }
+
                     const controlBehavior =
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
 
@@ -799,6 +827,13 @@ const GetGhostsAsSignals = (
 };
 
 const UpdateSensor = (ghostScanner: GhostScanner) => {
+    if (!ghostScanner.entity.valid) {
+        ModLog(`Scanner ${ghostScanner.id} is gone without an event, forgetting it`);
+        ForgetLogisticGroup(ghostScanner.id);
+        RemoveSensor(ghostScanner.id);
+        return;
+    }
+
     const controlBehavior =
         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
     if (!controlBehavior.enabled) {
@@ -930,10 +965,12 @@ function UpdateEventHandlers() {
         script.on_event(defines.events.on_pre_player_mined_item, OnEntityRemoved);
         script.on_event(defines.events.on_robot_pre_mined, OnEntityRemoved);
         script.on_event(defines.events.on_entity_died, OnEntityRemoved);
+        script.on_event(defines.events.script_raised_destroy, OnEntityRemoved);
     } else {
         script.on_event(defines.events.on_pre_player_mined_item, undefined);
         script.on_event(defines.events.on_robot_pre_mined, undefined);
         script.on_event(defines.events.on_entity_died, undefined);
+        script.on_event(defines.events.script_raised_destroy, undefined);
     }
 }
 
