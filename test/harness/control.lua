@@ -1,34 +1,83 @@
--- Headless acceptance test for Ghost Scanner 4.
+-- Headless acceptance tests for Ghost Scanner 4.
 --
--- Builds a known layout, lets the mod scan it, and compares the combinator output
--- against an expected signal set. Runs with no player connected, so anything that
--- needs a client (map alerts) is out of scope here.
+-- One world is built for every scenario; the scenario picked by the gs4test-scenario
+-- setting decides which sequence of steps runs against it. Steps advance one per scan
+-- cycle. Note that on_nth_tick fires at tick 0 too, so step 1 is only a warm up: the mod
+-- needs a cycle between an action and the assertion about it.
+--
+-- Runs with no player connected, so anything needing a client (map alerts) is out of
+-- scope here.
 
+-- raw counts, before the output shaping settings are applied
 local EXPECTED = {
-    ["cliff-explosives/normal"] = 1, -- cliff covered by BOTH roboports, must count once
-    ["transport-belt/normal"] = 2, -- two ghosts of the same item, must be summed
-    ["transport-belt/rare"] = 1, -- same item, different quality, must stay separate
-    ["fast-inserter/uncommon"] = 1,
-    ["fast-transport-belt/normal"] = 1, -- upgrade order, reports the target item
-    ["assembling-machine-2/normal"] = 1,
-    ["speed-module/normal"] = 2, -- item request proxy
-    ["concrete/normal"] = 1 -- tile ghost, must be an item signal, not virtual
+    ["cliff-explosives"] = 1, -- cliff covered by BOTH roboports, must count once
+    ["transport-belt"] = 2, -- two ghosts of the same item, must be summed
+    ["fast-transport-belt"] = 1, -- upgrade order, reports the target item
+    ["assembling-machine-2"] = 1,
+    ["speed-module"] = 2, -- item request proxy
+    ["concrete"] = 1 -- tile ghost, must be an item signal, not virtual
+}
+
+-- same item, other qualities: these must stay separate signals
+local EXPECTED_QUALITY = {
+    ["transport-belt/rare"] = 1,
+    ["fast-inserter/uncommon"] = 1
 }
 
 local failures = 0
+local checks = 0
 
 local function check(ok, fmt, ...)
     local line = string.format(fmt, ...)
+    checks = checks + 1
     if not ok then
         failures = failures + 1
         log("GS4TEST   FAIL " .. line)
     else
         log("GS4TEST   ok   " .. line)
     end
+    return ok
+end
+
+local function scenario()
+    return settings.global["gs4test-scenario"].value
+end
+
+local function publishing()
+    return settings.global["ghost-scanner-logistic-group"].value
 end
 
 local function scanner()
     return game.surfaces[1].find_entities_filtered{name = "ghost-scanner"}[1]
+end
+
+local function group(entity)
+    return entity.get_control_behavior().get_section(1).group
+end
+
+local function networkAt(pos)
+    return game.surfaces[1].find_logistic_network_by_position(pos, game.forces.player)
+end
+
+local function roboport(x, y)
+    local rp = game.surfaces[1].create_entity{
+        name = "roboport", position = {x, y or 0}, force = game.forces.player
+    }
+    rp.energy = 100000000
+    return rp
+end
+
+-- What the mod should output for a raw count, once the output shaping settings have had
+-- their say. Mirrors the mod deliberately: the raw numbers are asserted by the default
+-- run, these two settings only reshape them.
+local function shaped(name, count)
+    local value = settings.global["ghost-scanner-negative-output"].value and -count or count
+    if settings.global["ghost-scanner-round2stack"].value then
+        local stack = prototypes.item[name].stack_size
+        local round = value < 0 and math.floor or math.ceil
+        value = round(value / stack) * stack
+    end
+    return value
 end
 
 local function readSignals()
@@ -51,19 +100,57 @@ local function readSignals()
     return out
 end
 
-local function group(entity)
-    return entity.get_control_behavior().get_section(1).group
-end
+-- asserts the full expected signal set, with `extra` merged in (raw counts)
+local function checkSignals(label, extra)
+    local signals = readSignals()
+    if not check(signals ~= nil, "%s: scanner exists and has a control behavior", label) then
+        return
+    end
+    if not signals then
+        return
+    end
 
-local function networkAt(pos)
-    return game.surfaces[1].find_logistic_network_by_position(pos, game.forces.player)
+    local want = {}
+    for name, count in pairs(EXPECTED) do
+        want[name .. "/normal"] = shaped(name, count)
+    end
+    for key, count in pairs(EXPECTED_QUALITY) do
+        want[key] = shaped(string.match(key, "^[^/]+"), count)
+    end
+    for name, count in pairs(extra or {}) do
+        want[name .. "/normal"] = shaped(name, count)
+    end
+
+    local wrong = {}
+    for key, value in pairs(want) do
+        if signals[key] ~= value then
+            table.insert(wrong, string.format("%s=%s want %s", key, tostring(signals[key]), tostring(value)))
+        end
+    end
+    for key, value in pairs(signals) do
+        if want[key] == nil then
+            table.insert(wrong, string.format("%s=%d unexpected", key, value))
+        end
+    end
+
+    local shown = {}
+    for key, value in pairs(signals) do
+        table.insert(shown, string.format("%s=%s", key, tostring(value)))
+    end
+    table.sort(shown)
+    log(string.format("GS4TEST   .... %s: [%s]", label, table.concat(shown, " ")))
+
+    check(#wrong == 0, "%s: signals match (%s)", label,
+        #wrong == 0 and "all" or table.concat(wrong, "; "))
 end
 
 script.on_init(function()
     local s = game.surfaces[1]
     local f = game.forces.player
     f.research_all_technologies()
-    for _, e in pairs(s.find_entities_filtered{area = {{-60, -60}, {60, 60}}}) do
+    s.request_to_generate_chunks({150, 0}, 12)
+    s.force_generate_chunk_requests()
+    for _, e in pairs(s.find_entities_filtered{area = {{-80, -80}, {380, 80}}}) do
         if e.type ~= "character" then
             e.destroy()
         end
@@ -75,10 +162,8 @@ script.on_init(function()
     s.create_entity{name = "substation", position = {-5, 0}, force = f}
 
     -- two roboports with overlapping construction areas, to exercise dedup
-    for _, pos in pairs({{0, 0}, {20, 0}}) do
-        local rp = s.create_entity{name = "roboport", position = pos, force = f}
-        rp.energy = 100000000
-    end
+    roboport(0)
+    roboport(20)
 
     storage.chest = s.create_entity{name = "requester-chest", position = {2.5, 2.5}, force = f}
     s.create_entity{name = "ghost-scanner", position = {3, 3}, force = f, raise_built = true}
@@ -97,71 +182,45 @@ script.on_init(function()
     local belt = s.create_entity{name = "transport-belt", position = {6.5, 2.5}, force = f}
     belt.order_upgrade{force = f, target = "fast-transport-belt"}
 
-    -- a second network far away, named the same as the first. A split leaves exactly
-    -- this situation: two networks both answering to "Outpost Foo".
-    s.request_to_generate_chunks({300, 0}, 4)
-    s.force_generate_chunk_requests()
-    local fareei = s.create_entity{name = "electric-energy-interface", position = {290, 0}, force = f}
-    fareei.power_production = 10000000
-    s.create_entity{name = "substation", position = {295, 0}, force = f}
-    local far = s.create_entity{name = "roboport", position = {300, 0}, force = f}
-    far.energy = 100000000
-    storage.far = s.create_entity{name = "ghost-scanner", position = {303, 3}, force = f, raise_built = true}
-    s.create_entity{name = "entity-ghost", inner_name = "iron-chest", position = {305.5, 5.5}, force = f}
-
-    networkAt({0, 0}).custom_name = "Outpost Foo"
-    networkAt({300, 0}).custom_name = "Outpost Foo"
-
     local am = s.create_entity{name = "assembling-machine-2", position = {12.5, 12.5}, force = f}
     s.create_entity{
         name = "item-request-proxy", target = am, force = f, position = am.position,
         modules = {{id = {name = "speed-module"}, items = {in_inventory = {{inventory = defines.inventory.crafter_modules, stack = 0, count = 2}}}}}
     }
+
+    -- a second network far away, deliberately given the SAME name. A split leaves
+    -- exactly this situation: two networks both answering to "Outpost Foo".
+    local fareei = s.create_entity{name = "electric-energy-interface", position = {290, 0}, force = f}
+    fareei.power_production = 10000000
+    s.create_entity{name = "substation", position = {295, 0}, force = f}
+    roboport(300)
+    storage.far = s.create_entity{name = "ghost-scanner", position = {303, 3}, force = f, raise_built = true}
+    s.create_entity{name = "entity-ghost", inner_name = "iron-chest", position = {305.5, 5.5}, force = f}
+
+    networkAt({0, 0}).custom_name = "Outpost Foo"
+    networkAt({300, 0}).custom_name = "Outpost Foo"
 end)
 
--- give the mod a few scan cycles, then assert
--- One step per scan cycle. Note that on_nth_tick fires at tick 0 as well, so the first
--- step is only a warm up: the mod needs a cycle between an action and its assertion.
-script.on_nth_tick(300, function()
-    if storage.killed then
-        return
-    end
+local scenarios = {}
 
-    storage.step = (storage.step or 0) + 1
-    local groupsOn = settings.global["ghost-scanner-logistic-group"].value
-    local sc = scanner()
-
-    if storage.step == 1 then
-        log(string.format("GS4TEST logistic group setting = %s", tostring(groupsOn)))
-        return
-    end
-
-    if storage.step == 2 then
-        local signals = readSignals()
-        check(signals ~= nil, "scanner exists and has a control behavior")
-        if signals then
-            for key, want in pairs(EXPECTED) do
-                check(signals[key] == want, "%s = %s (expected %s)", key, tostring(signals[key]), tostring(want))
-            end
-            for key, got in pairs(signals) do
-                if not EXPECTED[key] then
-                    check(false, "unexpected signal %s = %d", key, got)
-                end
-            end
-        end
-
-        check(sc.operable, "scanner can be opened in normal play")
-
-        if not groupsOn then
+-- signal correctness, and the settings that reshape the numbers
+scenarios.signals = {
+    function()
+        checkSignals("baseline")
+        check(scanner().operable, "scanner can be opened in normal play")
+        if not publishing() then
             check(#game.forces.player.get_logistic_groups() == 0,
                 "no logistic group is published when the setting is off")
-            sc.die()
-            storage.far.die()
-            storage.killed = true
-            return
         end
+        return "done"
+    end
+}
 
-        -- the name comes from the logistic network the scanner sits in
+-- naming, renaming and the collision between identically named networks
+scenarios.groups = {
+    function()
+        local sc = scanner()
+        checkSignals("baseline")
         check(group(sc) == "Construction Requests for Outpost Foo",
             "group derived from the network name (got %q)", group(sc))
 
@@ -182,16 +241,16 @@ script.on_nth_tick(300, function()
 
         storage.oldGroup = group(sc)
         networkAt({0, 0}).custom_name = "Outpost Bar"
-
-    elseif storage.step == 3 then
+    end,
+    function()
+        local sc = scanner()
         check(group(sc) == "Construction Requests for Outpost Bar",
             "group followed the network rename (got %q)", group(sc))
-
-        -- pin it by hand, the way a player would in the combinator GUI
         storage.oldGroup = group(sc)
         sc.get_control_behavior().get_section(1).group = "Outpost Foo Requests"
-
-    elseif storage.step == 4 then
+    end,
+    function()
+        local sc = scanner()
         check(group(sc) == "Outpost Foo Requests", "typed name stuck (got %q)", group(sc))
         check(game.forces.player.get_logistic_group(storage.oldGroup) == nil,
             "the derived group it replaced is gone (%s)", storage.oldGroup)
@@ -201,35 +260,111 @@ script.on_nth_tick(300, function()
         for _ in pairs(pinned and pinned.filters or {}) do n = n + 1 end
         check(n > 0, "pinned group is still fed by the scanner (%d filters)", n)
 
-        -- the far network is still called "Outpost Foo". Once the first scanner stopped
-        -- answering to that name, the one that was blocked on it takes it over.
+        -- the far network is still called "Outpost Foo", so now that nothing answers to
+        -- the derived name, the scanner that was blocked on it takes it over
         check(group(storage.far) == "Construction Requests for Outpost Foo",
-            "the freed name was taken over by the other network's scanner (got %q)",
-            group(storage.far))
+            "the freed name was taken over by the other network's scanner (got %q)", group(storage.far))
 
         networkAt({0, 0}).custom_name = "Outpost Baz"
-
-    elseif storage.step == 5 then
-        check(group(sc) == "Outpost Foo Requests",
-            "a typed name is not moved by a later network rename (got %q)", group(sc))
-        sc.die()
-        storage.far.die()
-        storage.killed = true
+    end,
+    function()
+        check(group(scanner()) == "Outpost Foo Requests",
+            "a typed name is not moved by a later network rename (got %q)", group(scanner()))
+        return "done"
     end
-end)
+}
 
-script.on_nth_tick(60, function()
-    if not storage.killed or storage.reported then
+-- what happens to a scanner when its logistic network merges with another and splits again
+scenarios.topology = {
+    function()
+        checkSignals("before the merge")
+        check(networkAt({0, 0}).network_id ~= networkAt({300, 0}).network_id,
+            "the two networks start out separate")
+
+        -- bridge the gap; roboports link when their logistic areas overlap, ~50 tiles
+        storage.bridge = {}
+        for x = 60, 260, 40 do
+            table.insert(storage.bridge, roboport(x))
+        end
+    end,
+    function()
+        check(networkAt({0, 0}).network_id == networkAt({300, 0}).network_id,
+            "the networks merged into one")
+        -- the far network's ghost is now inside the scanner's own network
+        checkSignals("after the merge", {["iron-chest"] = 1})
+    end,
+    function()
+        for _, rp in pairs(storage.bridge) do
+            rp.destroy()
+        end
+    end,
+    function()
+        check(networkAt({0, 0}).network_id ~= networkAt({300, 0}).network_id,
+            "the networks split apart again")
+        checkSignals("after the split")
+        return "done"
+    end
+}
+
+-- turning the combinator off, and removal by another mod's script
+scenarios.lifecycle = {
+    function()
+        checkSignals("while enabled")
+        scanner().get_control_behavior().enabled = false
+    end,
+    function()
+        local sc = scanner()
+        local cb = sc.get_control_behavior()
+        local n = 0
+        for i = 1, cb.sections_count do
+            n = n + cb.get_section(i).filters_count
+        end
+        check(n == 0, "a disabled scanner publishes nothing (%d filters left)", n)
+        cb.enabled = true
+    end,
+    function()
+        checkSignals("after being switched back on")
+        storage.far.destroy{raise_destroy = true}
+        storage.destroyedName = "Ghost Scanner " .. storage.farId
+    end,
+    function()
+        -- script_raised_destroy has to be handled like a mined or killed scanner,
+        -- otherwise its force wide group outlives it
+        local leftover = {}
+        for _, g in pairs(game.forces.player.get_logistic_groups()) do
+            if g == storage.destroyedName then table.insert(leftover, g) end
+        end
+        check(#leftover == 0,
+            "a scanner destroyed by script takes its group with it (found [%s])",
+            table.concat(leftover, ", "))
+        return "done"
+    end
+}
+
+script.on_nth_tick(300, function()
+    if storage.finished then
         return
     end
-    storage.reported = true
 
-    local leftover = {}
-    for _, g in pairs(game.forces.player.get_logistic_groups()) do
-        table.insert(leftover, g)
+    storage.step = (storage.step or 0) + 1
+    if storage.step == 1 then
+        storage.farId = storage.far.unit_number
+        log(string.format("GS4TEST scenario=%s publishing=%s invert=%s stacks=%s",
+            scenario(), tostring(publishing()),
+            tostring(settings.global["ghost-scanner-negative-output"].value),
+            tostring(settings.global["ghost-scanner-round2stack"].value)))
+        return
     end
-    check(#leftover == 0, "no logistic group left after the scanners died (found [%s])",
-        table.concat(leftover, ", "))
 
-    log(string.format("GS4TEST RESULT %s (%d failure(s))", failures == 0 and "PASS" or "FAIL", failures))
+    local steps = scenarios[scenario()]
+    local step = steps[storage.step - 1]
+    if not step then
+        return
+    end
+
+    if step() == "done" then
+        storage.finished = true
+        log(string.format("GS4TEST RESULT %s (%d checks, %d failure(s))",
+            failures == 0 and "PASS" or "FAIL", checks, failures))
+    end
 end)
