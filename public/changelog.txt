@@ -8,6 +8,8 @@ Date: 2026-08-22
     - The logistic group is named after the logistic network the scanner sits in,
       "Construction Requests for <network name>", and follows the network's renames
     - The logistic group can be renamed on the combinator, which pins that name
+    - Added a "seance" remote interface, so other mods can read what a scanner found:
+      missing_items(unit_number) and logistic_group(unit_number)
   Changes:
     - Renamed from Ghost Scanner 4 to Séance. The combinator, its recipe and every
       mod setting keep their internal names, so a save can swap one mod for the other
@@ -25,6 +27,8 @@ Date: 2026-08-22
       per ghost instead of being summed into a single entry
     - Fixed cliff explosives being counted once per roboport covering the cliff
     - Fixed a crash on the tick after another mod removed a Ghost Scanner by script
+    - Fixed a crash when a removal event carried an already invalid entity, or when a
+      scanner turned out to have no control behavior (from upstream PR #228 by mcurses)
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.6
 Date: 2025-11-30

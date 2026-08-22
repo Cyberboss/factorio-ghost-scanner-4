@@ -334,7 +334,57 @@ const DeleteLogisticGroup = (force: LuaForce, id: UnitNumber) => {
 
 const MaxAlertsPerScanner = 5;
 
-const AlertMissingItems = (ghostScanner: GhostScanner, signalsForCombinator: GhostsAsSignals) => {
+interface MissingItem {
+    name: string;
+    quality: string;
+    needed: number;
+    available: number;
+}
+
+// What the network cannot currently supply of what its ghosts are asking for. Split out
+// from the alerting so it can be inspected without a connected player: alerts only exist
+// for players, which leaves nothing to assert against on a headless run.
+const CollectMissingItems = (ghostScanner: GhostScanner): MissingItem[] => {
+    const missing: MissingItem[] = [];
+    const entity = ghostScanner.entity;
+    if (!entity.valid) {
+        return missing;
+    }
+
+    const network = entity.surface.find_logistic_network_by_position(entity.position, entity.force);
+    if (!network) {
+        return missing;
+    }
+
+    for (const signal of storage.scanSignals.get(ghostScanner.id) ?? []) {
+        const filter = signal.value! as {
+            readonly name: string;
+            readonly quality?: QualityID;
+        };
+
+        // the count is negative when the output is inverted, and the shortfall is the
+        // same either way
+        const needed = math.abs(signal.min!);
+        if (needed == 0) {
+            continue;
+        }
+
+        const quality = filter.quality ?? "normal";
+        const available = network.get_item_count({ name: filter.name, quality });
+        if (available < needed) {
+            missing.push({
+                name: filter.name,
+                quality: (quality as LuaQualityPrototype).name ?? (quality as string),
+                needed,
+                available
+            });
+        }
+    }
+
+    return missing;
+};
+
+const AlertMissingItems = (ghostScanner: GhostScanner) => {
     const entity = ghostScanner.entity;
     const force = entity.force;
     force.remove_alert({ entity });
@@ -347,34 +397,18 @@ const AlertMissingItems = (ghostScanner: GhostScanner, signalsForCombinator: Gho
     const networkName = network.custom_name != "" ? network.custom_name : `${network.network_id}`;
 
     let alerts = 0;
-    for (const signal of signalsForCombinator) {
+    for (const item of CollectMissingItems(ghostScanner)) {
         if (alerts >= MaxAlertsPerScanner) {
             break;
         }
 
-        const filter = signal.value! as {
-            readonly name: string;
-            readonly quality?: QualityID;
-        };
-        const needed = math.abs(signal.min!);
-        if (needed == 0) {
-            continue;
-        }
-
-        const available = network.get_item_count({
-            name: filter.name,
-            quality: filter.quality ?? "normal"
-        });
-
-        if (available < needed) {
-            force.add_custom_alert(
-                entity,
-                { type: "item", name: filter.name, quality: filter.quality },
-                ["ghost-scanner.alert-missing", filter.name, needed - available, networkName],
-                true
-            );
-            ++alerts;
-        }
+        force.add_custom_alert(
+            entity,
+            { type: "item", name: item.name, quality: item.quality },
+            ["ghost-scanner.alert-missing", item.name, item.needed - item.available, networkName],
+            true
+        );
+        ++alerts;
     }
 };
 
@@ -406,7 +440,7 @@ const OnEntityRemoved = (
         | ScriptRaisedDestroyEvent
 ) => {
     const entity = event.entity;
-    if (entity.name == ScannerName) {
+    if (entity && entity.valid && entity.name == ScannerName) {
         // the group and any alerts outlive the entity, and both need it to still be
         // valid to be addressed, so they have to go before the sensor is forgotten
         const force = entity.force;
@@ -493,6 +527,12 @@ const UpdateArea = () => {
 
                     const controlBehavior =
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
+                    if (!controlBehavior) {
+                        ModLog(`Error: Scanner ${id} has no control behavior, dropping`);
+                        ForgetLogisticGroup(id);
+                        RemoveSensor(id);
+                        break;
+                    }
 
                     ClearCombinator(controlBehavior);
                     const section = controlBehavior.get_section(1)!;
@@ -507,7 +547,7 @@ const UpdateArea = () => {
                     }
 
                     if (alertMissingItems) {
-                        AlertMissingItems(ghostScanner, signalsForCombinator || []);
+                        AlertMissingItems(ghostScanner);
                     }
 
                     break;
@@ -839,6 +879,13 @@ const UpdateSensor = (ghostScanner: GhostScanner) => {
 
     const controlBehavior =
         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
+    if (!controlBehavior) {
+        ModLog(`Scanner ${ghostScanner.id} has no control behavior, forgetting it`);
+        ForgetLogisticGroup(ghostScanner.id);
+        RemoveSensor(ghostScanner.id);
+        return;
+    }
+
     if (!controlBehavior.enabled) {
         ModLog("Combinator disabled, not updating");
         ClearCombinator(controlBehavior);
@@ -994,6 +1041,24 @@ const InitStorage = () => {
     storage.pinnedGroups = storage.pinnedGroups || new LuaSet<UnitNumber>();
     storage.lookupItemsToPlaceThis = new LuaMap<string, ItemToPlace[]>();
 };
+
+// Reading a scanner from outside the mod. missing_items is also how the alerting is
+// tested: alerts themselves only exist for connected players.
+remote.add_interface("seance", {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    missing_items: (unitNumber: UnitNumber): MissingItem[] => {
+        for (const scanner of storage.ghostScanners) {
+            if (scanner.id == unitNumber) {
+                return CollectMissingItems(scanner);
+            }
+        }
+
+        return [];
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    logistic_group: (unitNumber: UnitNumber): string | undefined =>
+        storage.logisticGroups.get(unitNumber)
+});
 
 script.on_load(() => {
     InitEvents();
