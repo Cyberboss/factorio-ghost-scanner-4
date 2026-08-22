@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Headless acceptance test: builds the mod, loads it into a throwaway Factorio
-# install of its own, and asserts on what the scanner actually outputs.
+# Headless acceptance test: builds the mod, loads it into a throwaway Factorio install
+# of its own, and asserts on what the scanner actually outputs.
 #
 #   test/run.sh                 # run with the mod's default settings
 #   test/run.sh --groups        # also turn "Publish to logistic group" on
-#   test/run.sh --upgrade       # create the save with the PREVIOUS commit's build,
-#                               # then load it with this one. Catches storage added
-#                               # without a migration: on_configuration_changed does
-#                               # not fire between builds of the same mod version.
-#   FACTORIO=/path/to/binary test/run.sh
+#   test/run.sh --upgrade       # write the save with the PREVIOUS commit's build, then
+#                               # load it with this one. Catches storage added without a
+#                               # migration: on_configuration_changed does not fire
+#                               # between builds of the same mod version.
 #
-# Nothing here touches your real mods folder or saves.
+#   FACTORIO=/path/to/binary TICKS=3000 test/run.sh
+#
+# Nothing here touches your real mods folder or saves, and it has its own Factorio write
+# directory, so it runs while you have the game open.
 set -euo pipefail
 
 REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -28,21 +30,39 @@ esac
 
 [ -x "$FACTORIO" ] || { echo "Factorio binary not found at $FACTORIO (set FACTORIO=...)"; exit 1; }
 
-# the game takes an exclusive lock on its user data directory, so give this run its
-# own write directory: that way it works while you have Factorio open
-mkdir -p "$WORK/write"
-CONFIG="$WORK/config.ini"
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+
+# every build wipes build/, so all building happens before anything is staged
+if [ "$UPGRADE" = "1" ]; then
+    git -C "$REPO" diff --quiet -- src public locale || {
+        echo "--upgrade rebuilds src/public/locale from the previous commit, so those must be clean"
+        exit 1
+    }
+    PREV="$(git -C "$REPO" rev-parse --short HEAD~1)"
+    echo "==> building previous commit $PREV, to write the save with"
+    git -C "$REPO" checkout -q "$PREV" -- src public locale
+    (cd "$REPO" && yarn build >/dev/null)
+    cp "$REPO"/build/GhostScanner4_*.zip "$STAGE/old.zip"
+    git -C "$REPO" checkout -q HEAD -- src public locale
+fi
 
 echo "==> building"
 (cd "$REPO" && yarn build >/dev/null)
-ZIP="$(ls "$REPO"/build/GhostScanner4_*.zip | head -1)"
+cp "$REPO"/build/GhostScanner4_*.zip "$STAGE/new.zip"
 
-echo "==> staging $(basename "$ZIP")"
+echo "==> staging"
 rm -rf "$WORK"
-mkdir -p "$WORK/mods"
-mkdir -p "$WORK/write"
-cp "$ZIP" "$WORK/mods/"
+mkdir -p "$WORK/mods" "$WORK/write"
 cp -R "$REPO/test/harness" "$WORK/mods/gs4test_1.0.0"
+if [ "$UPGRADE" = "1" ]; then
+    cp "$STAGE/old.zip" "$WORK/mods/GhostScanner4_4.1.0.zip"
+else
+    cp "$STAGE/new.zip" "$WORK/mods/GhostScanner4_4.1.0.zip"
+fi
+
+# the game takes an exclusive lock on its user data directory, so give this run its own
+CONFIG="$WORK/config.ini"
 cat > "$CONFIG" <<INI
 [path]
 read-data=__PATH__executable__/../data
@@ -65,33 +85,21 @@ if [ "$WITH_GROUPS" = "1" ]; then
         ghost-scanner-logistic-group=true
 fi
 
-if [ "$UPGRADE" = "1" ]; then
-    git -C "$REPO" diff --quiet -- src public locale || {
-        echo "--upgrade rebuilds src/public/locale from the previous commit, so those must be clean"
-        exit 1
-    }
-    PREV="$(git -C "$REPO" rev-parse --short HEAD~1)"
-    echo "==> building previous commit $PREV to write the save with"
-    git -C "$REPO" checkout -q "$PREV" -- src public locale
-    (cd "$REPO" && yarn build >/dev/null)
-    cp "$REPO"/build/GhostScanner4_*.zip "$WORK/mods/"
-    git -C "$REPO" checkout -q HEAD -- src public locale
-    (cd "$REPO" && yarn build >/dev/null)
-fi
-
 echo "==> creating map"
 "$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --create "$WORK/test.zip" 2>&1 \
     | grep -E "^ *[0-9.]+ (Error|Warning)" || true
 
 if [ "$UPGRADE" = "1" ]; then
     echo "==> swapping in the current build and loading that save"
-    cp "$ZIP" "$WORK/mods/"
+    cp "$STAGE/new.zip" "$WORK/mods/GhostScanner4_4.1.0.zip"
 fi
 
 echo "==> running $TICKS ticks"
-OUT="$("$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --benchmark "$WORK/test.zip" --benchmark-ticks "$TICKS" 2>&1 || true)"
+OUT="$("$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --benchmark "$WORK/test.zip" \
+    --benchmark-ticks "$TICKS" 2>&1 || true)"
 
-echo "$OUT" | grep -E "GS4TEST|Error while running|caused a non-recoverable" | sed -E 's/^.*(GS4TEST|Error)/\1/' || true
+echo "$OUT" | grep -E "GS4TEST|Error while running|caused a non-recoverable|attempt to" \
+    | sed -E 's/^.*(GS4TEST|Error|attempt)/\1/' || true
 
 if echo "$OUT" | grep -q "GS4TEST RESULT PASS"; then
     echo "==> PASS"
