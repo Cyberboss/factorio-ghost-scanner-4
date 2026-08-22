@@ -1,8 +1,13 @@
 {
-    "name": "gs4test",
+    "name": "seance-test",
     "version": "1.0.0",
-    "title": "Ghost Scanner 4 test harness",
-    "author": "Ghost Scanner 4",
+    "title": "Séance test harness",
+    "author": "Séance",
     "factorio_version": "2.1",
-    "dependencies": ["base >= 2.1.0", "quality", "GhostScanner4"]
+    "dependencies": [
+        "base >= 2.1.0",
+        "quality",
+        "? Seance",
+        "? GhostScanner4"
+    ]
 }

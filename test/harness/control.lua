@@ -1,6 +1,6 @@
--- Headless acceptance tests for Ghost Scanner 4.
+-- Headless acceptance tests for Séance.
 --
--- One world is built for every scenario; the scenario picked by the gs4test-scenario
+-- One world is built for every scenario; the scenario picked by the seance-test-scenario
 -- setting decides which sequence of steps runs against it. Steps advance one per scan
 -- cycle. Note that on_nth_tick fires at tick 0 too, so step 1 is only a warm up: the mod
 -- needs a cycle between an action and the assertion about it.
@@ -32,15 +32,15 @@ local function check(ok, fmt, ...)
     checks = checks + 1
     if not ok then
         failures = failures + 1
-        log("GS4TEST   FAIL " .. line)
+        log("SEANCE   FAIL " .. line)
     else
-        log("GS4TEST   ok   " .. line)
+        log("SEANCE   ok   " .. line)
     end
     return ok
 end
 
 local function scenario()
-    return settings.global["gs4test-scenario"].value
+    return settings.global["seance-test-scenario"].value
 end
 
 local function publishing()
@@ -138,7 +138,7 @@ local function checkSignals(label, extra)
         table.insert(shown, string.format("%s=%s", key, tostring(value)))
     end
     table.sort(shown)
-    log(string.format("GS4TEST   .... %s: [%s]", label, table.concat(shown, " ")))
+    log(string.format("SEANCE   .... %s: [%s]", label, table.concat(shown, " ")))
 
     check(#wrong == 0, "%s: signals match (%s)", label,
         #wrong == 0 and "all" or table.concat(wrong, "; "))
@@ -226,7 +226,7 @@ scenarios.groups = {
 
         -- the far network answers to the same name. Only one scanner may own it, and it
         -- has to be the same one after every reload, so the lowest unit number wins.
-        check(group(storage.far) == "Ghost Scanner " .. storage.far.unit_number,
+        check(group(storage.far) == "Séance " .. storage.far.unit_number,
             "scanner in an identically named network kept its own group (got %q)", group(storage.far))
 
         local secs = storage.chest.get_logistic_sections()
@@ -325,7 +325,7 @@ scenarios.lifecycle = {
     function()
         checkSignals("after being switched back on")
         storage.far.destroy{raise_destroy = true}
-        storage.destroyedName = "Ghost Scanner " .. storage.farId
+        storage.destroyedName = "Séance " .. storage.farId
     end,
     function()
         -- script_raised_destroy has to be handled like a mined or killed scanner,
@@ -349,7 +349,7 @@ script.on_nth_tick(300, function()
     storage.step = (storage.step or 0) + 1
     if storage.step == 1 then
         storage.farId = storage.far.unit_number
-        log(string.format("GS4TEST scenario=%s publishing=%s invert=%s stacks=%s",
+        log(string.format("SEANCE scenario=%s publishing=%s invert=%s stacks=%s",
             scenario(), tostring(publishing()),
             tostring(settings.global["ghost-scanner-negative-output"].value),
             tostring(settings.global["ghost-scanner-round2stack"].value)))
@@ -364,7 +364,7 @@ script.on_nth_tick(300, function()
 
     if step() == "done" then
         storage.finished = true
-        log(string.format("GS4TEST RESULT %s (%d checks, %d failure(s))",
+        log(string.format("SEANCE RESULT %s (%d checks, %d failure(s))",
             failures == 0 and "PASS" or "FAIL", checks, failures))
     end
 end)

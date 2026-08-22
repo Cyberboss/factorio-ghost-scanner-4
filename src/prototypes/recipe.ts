@@ -2,7 +2,7 @@ data.extend([
     {
         type: "recipe",
         name: "ghost-scanner",
-        icon: "__GhostScanner4__/graphics/icons/ghost-scanner.png",
+        icon: "__Seance__/graphics/icons/ghost-scanner.png",
         icon_size: 32,
         enabled: false,
         ingredients: [

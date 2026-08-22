@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------------------------------
-Version: 4.1.0
+Version: 5.0.0
 Date: 2026-08-22
   Features:
     - Scanner results can be published as a logistic group, so requester chests and
@@ -9,6 +9,9 @@ Date: 2026-08-22
       "Construction Requests for <network name>", and follows the network's renames
     - The logistic group can be renamed on the combinator, which pins that name
   Changes:
+    - Renamed from Ghost Scanner 4 to Séance. The combinator, its recipe and every
+      mod setting keep their internal names, so a save can swap one mod for the other
+      and keep the combinators it already has, along with their settings
     - Ghost Scanners can be opened again, so their logistic group can be renamed and
       the on/off switch is reachable outside the editor
     - Only the first section of a Ghost Scanner is managed by the mod; any section

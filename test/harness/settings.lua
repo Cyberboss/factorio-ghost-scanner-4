@@ -3,7 +3,7 @@
 data:extend({
     {
         type = "string-setting",
-        name = "gs4test-scenario",
+        name = "seance-test-scenario",
         setting_type = "runtime-global",
         default_value = "signals",
         allowed_values = {"signals", "groups", "topology", "lifecycle"}

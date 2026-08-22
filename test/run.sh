@@ -55,7 +55,7 @@ esac
 
 # every scenario except the plain signal run needs the groups published
 [ "$SCENARIO" = "signals" ] || SETTINGS+=(ghost-scanner-logistic-group=true)
-SETTINGS+=("gs4test-scenario=$SCENARIO")
+SETTINGS+=("seance-test-scenario=$SCENARIO")
 
 [ -x "$FACTORIO" ] || { echo "Factorio binary not found at $FACTORIO (set FACTORIO=...)"; exit 1; }
 
@@ -72,22 +72,28 @@ if [ "$UPGRADE" = "1" ]; then
     echo "==> building previous commit $PREV, to write the save with"
     git -C "$REPO" checkout -q "$PREV" -- src public locale
     (cd "$REPO" && yarn build >/dev/null)
-    cp "$REPO"/build/GhostScanner4_*.zip "$STAGE/old.zip"
+    OLD_ZIP_NAME="$(basename "$(ls "$REPO"/build/*.zip | head -1)")"
+    cp "$REPO"/build/*.zip "$STAGE/old.zip"
+    OLD_MOD="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['name'])" "$REPO/public/info.json")"
     git -C "$REPO" checkout -q HEAD -- src public locale
 fi
 
 echo "==> building"
 (cd "$REPO" && yarn build >/dev/null)
-cp "$REPO"/build/GhostScanner4_*.zip "$STAGE/new.zip"
+NEW_ZIP_NAME="$(basename "$(ls "$REPO"/build/*.zip | head -1)")"
+cp "$REPO"/build/*.zip "$STAGE/new.zip"
+MOD="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['name'])" "$REPO/public/info.json")"
+OLD_MOD="${OLD_MOD:-$MOD}"
 
 echo "==> staging"
 rm -rf "$WORK"
 mkdir -p "$WORK/mods" "$WORK/write"
-cp -R "$REPO/test/harness" "$WORK/mods/gs4test_1.0.0"
+cp -R "$REPO/test/harness" "$WORK/mods/seance-test_1.0.0"
 if [ "$UPGRADE" = "1" ]; then
-    cp "$STAGE/old.zip" "$WORK/mods/GhostScanner4_4.1.0.zip"
+    # Factorio insists the file is named exactly <mod name>_<version>.zip
+    cp "$STAGE/old.zip" "$WORK/mods/$OLD_ZIP_NAME"
 else
-    cp "$STAGE/new.zip" "$WORK/mods/GhostScanner4_4.1.0.zip"
+    cp "$STAGE/new.zip" "$WORK/mods/$NEW_ZIP_NAME"
 fi
 
 # the game takes an exclusive lock on its user data directory, so give this run its own
@@ -104,8 +110,9 @@ cat > "$WORK/mods/mod-list.json" <<JSON
   {"name":"quality","enabled":true},
   {"name":"elevated-rails","enabled":false},
   {"name":"space-age","enabled":false},
-  {"name":"GhostScanner4","enabled":true},
-  {"name":"gs4test","enabled":true}
+  {"name":"$MOD","enabled":true},
+  {"name":"$OLD_MOD","enabled":true},
+  {"name":"seance-test","enabled":true}
 ]}
 JSON
 
@@ -117,17 +124,18 @@ echo "==> creating map"
 
 if [ "$UPGRADE" = "1" ]; then
     echo "==> swapping in the current build and loading that save"
-    cp "$STAGE/new.zip" "$WORK/mods/GhostScanner4_4.1.0.zip"
+    rm -f "$WORK/mods/$OLD_ZIP_NAME"
+    cp "$STAGE/new.zip" "$WORK/mods/$NEW_ZIP_NAME"
 fi
 
 echo "==> running $TICKS ticks, scenario $SCENARIO"
 OUT="$("$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --benchmark "$WORK/test.zip" \
     --benchmark-ticks "$TICKS" 2>&1 || true)"
 
-echo "$OUT" | grep -E "GS4TEST|Error while running|caused a non-recoverable|attempt to" \
-    | sed -E 's/^.*(GS4TEST|Error|attempt)/\1/' || true
+echo "$OUT" | grep -E "SEANCE|Error while running|caused a non-recoverable|attempt to" \
+    | sed -E 's/^.*(SEANCE|Error|attempt)/\1/' || true
 
-if echo "$OUT" | grep -q "GS4TEST RESULT PASS"; then
+if echo "$OUT" | grep -q "SEANCE RESULT PASS"; then
     echo "==> PASS"
 else
     echo "==> FAIL (no passing result line; see output above)"

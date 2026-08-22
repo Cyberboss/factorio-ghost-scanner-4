@@ -182,7 +182,10 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
 // output directly. The default name is keyed on the scanner's unit number so that it
 // is stable for the life of the combinator, but the player can rename the group on the
 // combinator and that name is then kept.
-const DefaultLogisticGroupName = (id: UnitNumber) => `Ghost Scanner ${id}`;
+const DefaultLogisticGroupName = (id: UnitNumber) => `Séance ${id}`;
+
+// what DefaultLogisticGroupName produced before the mod was renamed
+const LegacyLogisticGroupName = (id: UnitNumber) => `Ghost Scanner ${id}`;
 
 const NetworkGroupPrefix = "Construction Requests for ";
 
@@ -916,7 +919,7 @@ const MigrateStorage = () => {
     // the generated one was typed by the player and has to stay pinned rather than being
     // replaced by a name derived from the network
     for (const [id, name] of storage.logisticGroups) {
-        if (name != DefaultLogisticGroupName(id)) {
+        if (name != DefaultLogisticGroupName(id) && name != LegacyLogisticGroupName(id)) {
             storage.pinnedGroups.add(id);
         }
     }
