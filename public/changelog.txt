@@ -1,6 +1,10 @@
 ---------------------------------------------------------------------------------------------------
 Version: 4.1.0
 Date: 2026-08-22
+  Features:
+    - Scanner results can be published as a logistic group, so requester chests and
+      platform hubs can consume them directly without any circuit wiring (off by default)
+    - Optional map alerts when a logistic network cannot supply what its ghosts request
   Changes:
     - Ported to Factorio 2.1
     - Item request proxies are tracked with a 2.1 notification queue instead of

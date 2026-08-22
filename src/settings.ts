@@ -1,5 +1,7 @@
 import {
     AreasPerTickSetting,
+    LogisticGroupSetting,
+    MissingAlertsSetting,
     MaxResultsSetting,
     NegativeOutputSetting,
     RoundToStackSetting,
@@ -62,6 +64,20 @@ data.extend([
         type: "bool-setting",
         name: RoundToStackSetting,
         order: "bb",
+        setting_type: "runtime-global",
+        default_value: false
+    },
+    {
+        type: "bool-setting",
+        name: LogisticGroupSetting,
+        order: "ca",
+        setting_type: "runtime-global",
+        default_value: false
+    },
+    {
+        type: "bool-setting",
+        name: MissingAlertsSetting,
+        order: "cb",
         setting_type: "runtime-global",
         default_value: false
     }

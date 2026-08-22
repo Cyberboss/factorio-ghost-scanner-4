@@ -8,6 +8,7 @@ import {
     LuaEntityPrototype,
     LuaForce,
     LuaLogisticCell,
+    LuaLogisticSection,
     LuaNotificationQueue,
     LuaQualityPrototype,
     LuaTilePrototype,
@@ -28,7 +29,9 @@ import {
 
 import {
     AreasPerTickSetting,
+    LogisticGroupSetting,
     MaxResultsSetting,
+    MissingAlertsSetting,
     NegativeOutputSetting,
     RoundToStackSetting,
     ScanAreasDelaySetting,
@@ -86,6 +89,8 @@ if (maxResults == 0) {
 let showHidden = settings.global[ShowHiddenSetting].value as boolean;
 let invertSign = settings.global[NegativeOutputSetting].value as boolean;
 let roundToStack = settings.global[RoundToStackSetting].value as boolean;
+let publishLogisticGroup = settings.global[LogisticGroupSetting].value as boolean;
+let alertMissingItems = settings.global[MissingAlertsSetting].value as boolean;
 script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
     ModLog("Settings changed");
     let updateEventHandlers = false;
@@ -127,12 +132,106 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
             scanAreasDelay = settings.global[ScanAreasDelaySetting].value as number;
             break;
         }
+        case LogisticGroupSetting: {
+            publishLogisticGroup = settings.global[LogisticGroupSetting].value as boolean;
+            if (!publishLogisticGroup) {
+                // the groups are force wide, so they outlive the sections that fed them
+                for (const scanner of storage.ghostScanners) {
+                    if (scanner.entity.valid) {
+                        DeleteLogisticGroup(scanner.entity.force, scanner.id);
+                    }
+                }
+            }
+
+            break;
+        }
+        case MissingAlertsSetting: {
+            alertMissingItems = settings.global[MissingAlertsSetting].value as boolean;
+            if (!alertMissingItems) {
+                for (const scanner of storage.ghostScanners) {
+                    if (scanner.entity.valid) {
+                        scanner.entity.force.remove_alert({ entity: scanner.entity });
+                    }
+                }
+            }
+
+            break;
+        }
     }
 
     if (updateEventHandlers) {
         UpdateEventHandlers();
     }
 });
+
+// Sections that join a logistic group share their filters with every other member of
+// that group, force wide, which is what lets a requester chest consume a scanner's
+// output directly. The name is keyed on the scanner's unit number so that it stays
+// stable for the life of the combinator: a player who selects it on a chest keeps
+// pointing at the same scanner even if the network is renamed or renumbered.
+const LogisticGroupName = (id: UnitNumber) => `Ghost Scanner ${id}`;
+
+const ApplyLogisticGroup = (force: LuaForce, id: UnitNumber, section: LuaLogisticSection) => {
+    const name = LogisticGroupName(id);
+    if (publishLogisticGroup) {
+        if (section.group != name) {
+            force.create_logistic_group(name);
+            section.group = name;
+        }
+    } else if (section.group == name) {
+        section.group = "";
+    }
+};
+
+const DeleteLogisticGroup = (force: LuaForce, id: UnitNumber) => {
+    force.delete_logistic_group(LogisticGroupName(id));
+};
+
+const MaxAlertsPerScanner = 5;
+
+const AlertMissingItems = (ghostScanner: GhostScanner, signalsForCombinator: GhostsAsSignals) => {
+    const entity = ghostScanner.entity;
+    const force = entity.force;
+    force.remove_alert({ entity });
+
+    const network = entity.surface.find_logistic_network_by_position(entity.position, force);
+    if (!network) {
+        return;
+    }
+
+    const networkName = network.custom_name != "" ? network.custom_name : `${network.network_id}`;
+
+    let alerts = 0;
+    for (const signal of signalsForCombinator) {
+        if (alerts >= MaxAlertsPerScanner) {
+            break;
+        }
+
+        const filter = signal.value! as {
+            readonly name: string;
+            readonly quality?: QualityID;
+        };
+        const needed = math.abs(signal.min!);
+        if (needed == 0) {
+            continue;
+        }
+
+        const available = network.get_item_count({
+            name: filter.name,
+            quality: filter.quality ?? "normal"
+        });
+
+        if (available < needed) {
+            force.add_custom_alert(
+                entity,
+                { type: "item", name: filter.name, quality: filter.quality },
+                ["ghost-scanner.alert-missing", filter.name, needed - available, networkName],
+                true
+            );
+            ++alerts;
+        }
+    }
+};
 
 const OnEntityCreated = (
     event:
@@ -161,7 +260,13 @@ const OnEntityRemoved = (
 ) => {
     const entity = event.entity;
     if (entity.name == ScannerName) {
-        RemoveSensor(entity.unit_number!);
+        // the group and any alerts outlive the entity, and both need it to still be
+        // valid to be addressed, so they have to go before the sensor is forgotten
+        const force = entity.force;
+        const id = entity.unit_number!;
+        force.remove_alert({ entity });
+        DeleteLogisticGroup(force, id);
+        RemoveSensor(id);
     }
 };
 
@@ -239,13 +344,19 @@ const UpdateArea = () => {
                         ghostScanner.entity.get_control_behavior() as LuaConstantCombinatorControlBehavior;
 
                     ClearCombinator(controlBehavior);
+                    const section = controlBehavior.get_section(1)!;
+                    ApplyLogisticGroup(ghostScanner.entity.force, id, section);
+
                     const signalsForCombinator = storage.scanSignals.get(id);
                     if (signalsForCombinator && signalsForCombinator.length > 0) {
                         ModLog(`Setting filters for scanner ${id}`);
-                        const section = controlBehavior.get_section(1)!;
                         section.filters = signalsForCombinator;
                     } else {
                         ModLog(`No filters for scanner ${id}`);
+                    }
+
+                    if (alertMissingItems) {
+                        AlertMissingItems(ghostScanner, signalsForCombinator || []);
                     }
 
                     break;
@@ -398,8 +509,6 @@ const GetGhostsAsSignals = (
     let countUniqueEntities = 0;
 
     for (const e of entities) {
-        // a fresh position table is returned on every read, so using it as a set key
-        // never matched and cliffs were recounted for every roboport covering them
         const uid = `c${e.position.x}/${e.position.y}`;
         if (
             !foundEntities.has(uid) &&
