@@ -306,6 +306,46 @@ scenarios.topology = {
     end
 }
 
+-- what the network cannot supply of what its ghosts want. The alerts themselves only
+-- exist for connected players, and a benchmark has none, so this drives the computation
+-- behind them through the mod's remote interface instead.
+scenarios.alerts = {
+    function()
+        local missing = {}
+        for _, item in pairs(remote.call("seance", "missing_items", scanner().unit_number)) do
+            missing[item.name .. "/" .. item.quality] = item
+        end
+
+        -- nothing is stocked yet, so everything the ghosts want is missing
+        check(missing["transport-belt/normal"] ~= nil, "an empty network reports transport-belt missing")
+        check(missing["concrete/normal"] ~= nil, "an empty network reports concrete missing")
+        if missing["transport-belt/normal"] then
+            local m = missing["transport-belt/normal"]
+            check(m.needed == 2 and m.available == 0,
+                "shortfall is reported as needed=%d available=%d", m.needed, m.available)
+        end
+
+        -- stock the network with more normal belts than the ghosts need, but no rare ones
+        local chest = game.surfaces[1].create_entity{
+            name = "storage-chest", position = {0.5, 6.5}, force = game.forces.player
+        }
+        chest.insert{name = "transport-belt", count = 50}
+    end,
+    function()
+        local missing = {}
+        for _, item in pairs(remote.call("seance", "missing_items", scanner().unit_number)) do
+            missing[item.name .. "/" .. item.quality] = item
+        end
+
+        check(missing["transport-belt/normal"] == nil,
+            "an item the network can supply is no longer missing")
+        check(missing["transport-belt/rare"] ~= nil,
+            "the same item in a quality the network does not stock is still missing")
+        check(missing["concrete/normal"] ~= nil, "an item it still cannot supply is still missing")
+        return "done"
+    end
+}
+
 -- turning the combinator off, and removal by another mod's script
 scenarios.lifecycle = {
     function()

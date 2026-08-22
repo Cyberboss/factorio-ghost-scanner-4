@@ -9,6 +9,7 @@
 #   test/run.sh --groups        # logistic group naming, renaming and collisions
 #   test/run.sh --topology      # the scanner's network merging with another and splitting
 #   test/run.sh --lifecycle     # switched off, switched on, destroyed by script
+#   test/run.sh --alerts        # what the network cannot supply of what its ghosts want
 #   test/run.sh --upgrade       # write the save with the PREVIOUS commit's build, then
 #                               # load it with this one. Catches storage added without a
 #                               # migration: on_configuration_changed does not fire
@@ -27,7 +28,7 @@ TICKS="${TICKS:-3000}"
 WORK="$REPO/build/test"
 
 if [ "${1:-}" = "--all" ]; then
-    for mode in "" --invert --stacks --slow --groups --topology --lifecycle --upgrade; do
+    for mode in "" --invert --stacks --slow --groups --topology --lifecycle --alerts --upgrade; do
         echo
         echo "############ test/run.sh ${mode:-(defaults)}"
         "${BASH_SOURCE[0]}" $mode || exit 1
@@ -48,6 +49,7 @@ case "${1:-}" in
     --groups)    SCENARIO=groups ;;
     --topology)  SCENARIO=topology ;;
     --lifecycle) SCENARIO=lifecycle ;;
+    --alerts)    SCENARIO=alerts; SETTINGS+=(ghost-scanner-missing-alerts=true) ;;
     --upgrade)   SCENARIO=groups; UPGRADE=1 ;;
     "")          ;;
     *)           echo "unknown option $1"; exit 1 ;;

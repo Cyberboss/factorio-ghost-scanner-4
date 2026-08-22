@@ -6,6 +6,6 @@ data:extend({
         name = "seance-test-scenario",
         setting_type = "runtime-global",
         default_value = "signals",
-        allowed_values = {"signals", "groups", "topology", "lifecycle"}
+        allowed_values = {"signals", "groups", "topology", "lifecycle", "alerts"}
     }
 })
