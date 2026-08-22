@@ -61,6 +61,9 @@ interface Storage {
     // so they are keyed by prefixed strings that cannot collide with a unit number
     foundEntities: LuaMap<UnitNumber, LuaSet<UnitNumber | string>>;
     proxyRegistrations: LuaMap<UnitNumber, LuaNotificationQueue>;
+    // the logistic group name last applied per scanner, so a name the player typed
+    // on the combinator can be told apart from one this mod put there
+    logisticGroups: LuaMap<UnitNumber, string>;
     updateTimeout: boolean;
     updateIndex: number;
     initMod: boolean;
@@ -166,25 +169,68 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
 
 // Sections that join a logistic group share their filters with every other member of
 // that group, force wide, which is what lets a requester chest consume a scanner's
-// output directly. The name is keyed on the scanner's unit number so that it stays
-// stable for the life of the combinator: a player who selects it on a chest keeps
-// pointing at the same scanner even if the network is renamed or renumbered.
-const LogisticGroupName = (id: UnitNumber) => `Ghost Scanner ${id}`;
+// output directly. The default name is keyed on the scanner's unit number so that it
+// is stable for the life of the combinator, but the player can rename the group on the
+// combinator and that name is then kept.
+const DefaultLogisticGroupName = (id: UnitNumber) => `Ghost Scanner ${id}`;
+
+// A group is force wide state that outlives the sections feeding it. One this mod no
+// longer writes to is dropped rather than left behind: its filters would freeze at the
+// last scan and any chest still pointing at it would silently keep requesting them.
+// Another scanner publishing into the same group is the one reason to keep it.
+const DropUnusedLogisticGroup = (force: LuaForce, name: string) => {
+    const group = force.get_logistic_group(name);
+    if (group) {
+        for (const member of group.members) {
+            const owner = member.owner;
+            if (owner.valid && owner.name == ScannerName) {
+                ModLog(`Keeping logistic group ${name}, another scanner publishes to it`);
+                return;
+            }
+        }
+    }
+
+    force.delete_logistic_group(name);
+};
 
 const ApplyLogisticGroup = (force: LuaForce, id: UnitNumber, section: LuaLogisticSection) => {
-    const name = LogisticGroupName(id);
-    if (publishLogisticGroup) {
-        if (section.group != name) {
-            force.create_logistic_group(name);
-            section.group = name;
+    const applied = storage.logisticGroups.get(id);
+
+    if (!publishLogisticGroup) {
+        if (applied != undefined) {
+            if (section.group == applied) {
+                section.group = "";
+            }
+
+            storage.logisticGroups.delete(id);
+            DropUnusedLogisticGroup(force, applied);
         }
-    } else if (section.group == name) {
-        section.group = "";
+
+        return;
     }
+
+    const current = section.group;
+    if (applied != undefined && current != "" && current != applied) {
+        // the player renamed the group on the combinator, so follow them there rather
+        // than dragging the section back to the generated name on every scan
+        ModLog(`Scanner ${id} logistic group renamed from ${applied} to ${current}`);
+        storage.logisticGroups.set(id, current);
+        DropUnusedLogisticGroup(force, applied);
+        return;
+    }
+
+    const name = applied ?? DefaultLogisticGroupName(id);
+    if (current != name) {
+        force.create_logistic_group(name);
+        section.group = name;
+    }
+
+    storage.logisticGroups.set(id, name);
 };
 
 const DeleteLogisticGroup = (force: LuaForce, id: UnitNumber) => {
-    force.delete_logistic_group(LogisticGroupName(id));
+    force.delete_logistic_group(storage.logisticGroups.get(id) ?? DefaultLogisticGroupName(id));
+    storage.logisticGroups.delete(id);
 };
 
 const MaxAlertsPerScanner = 5;
@@ -244,8 +290,6 @@ const OnEntityCreated = (
     if (entity.valid && entity.name == ScannerName) {
         ModLog("Found new ghost scanner");
 
-        entity.operable = false;
-
         storage.ghostScanners.push({
             id: entity.unit_number!,
             entity: entity
@@ -289,17 +333,15 @@ const RemoveSensor = (id: UnitNumber) => {
     UpdateEventHandlers();
 };
 
+// Only the first section belongs to this mod. The combinator can be opened, so any
+// further section is the player's and is left alone.
 const ClearCombinator = (controlBehavior: LuaConstantCombinatorControlBehavior) => {
-    if (controlBehavior.sections_count != 1) {
-        ModLog("Cleaning scanner");
-        for (let i = 1; i <= controlBehavior.sections_count; ++i) {
-            controlBehavior.remove_section(1);
-        }
-
-        controlBehavior.add_section()!.filters = [];
-    } else {
-        controlBehavior.get_section(1)!.filters = [];
+    if (controlBehavior.sections_count == 0) {
+        ModLog("Adding scanner section");
+        controlBehavior.add_section();
     }
+
+    controlBehavior.get_section(1)!.filters = [];
 };
 
 const UpdateArea = () => {
@@ -730,7 +772,6 @@ const InitMod = () => {
         });
 
         for (const entity of entities) {
-            entity.operable = false;
             storage.ghostScanners.push({
                 id: entity.unit_number!,
                 entity: entity
@@ -800,6 +841,7 @@ const InitStorage = () => {
     storage.foundEntities =
         storage.foundEntities || new LuaMap<UnitNumber, LuaSet<UnitNumber | string>>();
     storage.proxyRegistrations = new LuaMap<UnitNumber, LuaNotificationQueue>();
+    storage.logisticGroups = storage.logisticGroups || new LuaMap<UnitNumber, string>();
     storage.lookupItemsToPlaceThis = new LuaMap<string, ItemToPlace[]>();
 };
 
@@ -817,5 +859,13 @@ script.on_init(() => {
 script.on_configuration_changed(() => {
     ModLog("Config changed");
     InitStorage();
+
+    // scanners built while the mod sealed the entity keep operable = false in the save
+    for (const [, surface] of game.surfaces) {
+        for (const entity of surface.find_entities_filtered({ name: ScannerName })) {
+            entity.operable = true;
+        }
+    }
+
     InitEvents();
 });

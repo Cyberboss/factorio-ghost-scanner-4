@@ -5,7 +5,12 @@ Date: 2026-08-22
     - Scanner results can be published as a logistic group, so requester chests and
       platform hubs can consume them directly without any circuit wiring (off by default)
     - Optional map alerts when a logistic network cannot supply what its ghosts request
+    - The logistic group can be renamed on the combinator and the new name is kept
   Changes:
+    - Ghost Scanners can be opened again, so their logistic group can be renamed and
+      the on/off switch is reachable outside the editor
+    - Only the first section of a Ghost Scanner is managed by the mod; any section
+      added by the player is left alone
     - Ported to Factorio 2.1
     - Item request proxies are tracked with a 2.1 notification queue instead of
       permanent on_object_destroyed registrations

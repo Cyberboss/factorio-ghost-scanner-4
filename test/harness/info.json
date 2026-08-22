@@ -1,0 +1,8 @@
+{
+    "name": "gs4test",
+    "version": "1.0.0",
+    "title": "Ghost Scanner 4 test harness",
+    "author": "Ghost Scanner 4",
+    "factorio_version": "2.1",
+    "dependencies": ["base >= 2.1.0", "quality", "GhostScanner4"]
+}
