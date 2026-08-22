@@ -51,7 +51,13 @@ interface ScanArea {
     force: LuaForce;
 }
 
+// Bumped whenever a field is added here. on_configuration_changed only fires when the
+// mod version changes, so a save written by a different build of the SAME version comes
+// back with only on_load, which cannot create storage. Anything new would be nil.
+const StorageVersion = 2;
+
 interface Storage {
+    storageVersion: number;
     lookupItemsToPlaceThis: LuaMap<string, ItemToPlace[]>;
     ghostScanners: GhostScanner[];
     scanSignals: LuaMap<UnitNumber, LogisticFilterWrite[]>;
@@ -854,6 +860,35 @@ const InitMod = () => {
     storage.initMod = true;
 };
 
+// Runs from on_init, from on_configuration_changed, and from the first tick after a
+// load that skipped both, so a missing field can never reach the scan.
+const MigrateStorage = () => {
+    if (storage.storageVersion == StorageVersion) {
+        return;
+    }
+
+    ModLog(`Migrating storage from ${storage.storageVersion ?? 0} to ${StorageVersion}`);
+    InitStorage();
+
+    // scanners built while the mod sealed the entity keep operable = false in the save
+    for (const [, surface] of game.surfaces) {
+        for (const entity of surface.find_entities_filtered({ name: ScannerName })) {
+            entity.operable = true;
+        }
+    }
+
+    // group names used to be generated and nothing else, so any stored name that is not
+    // the generated one was typed by the player and has to stay pinned rather than being
+    // replaced by a name derived from the network
+    for (const [id, name] of storage.logisticGroups) {
+        if (name != DefaultLogisticGroupName(id)) {
+            storage.pinnedGroups.add(id);
+        }
+    }
+
+    storage.storageVersion = StorageVersion;
+};
+
 const InitEvents = () => {
     script.on_event(defines.events.on_built_entity, OnEntityCreated);
     script.on_event(defines.events.on_robot_built_entity, OnEntityCreated);
@@ -866,6 +901,8 @@ const OnTick = (event: OnTickEvent) => {
     if (event.tick % scanAreasDelay !== 0) {
         return;
     }
+
+    MigrateStorage();
 
     if (!storage.updateTimeout) {
         if (storage.updateIndex >= storage.ghostScanners.length) {
@@ -925,6 +962,7 @@ script.on_load(() => {
 script.on_init(() => {
     ModLog("On Init");
     InitStorage();
+    storage.storageVersion = StorageVersion;
     InitMod();
     InitEvents();
 });
@@ -932,22 +970,6 @@ script.on_init(() => {
 script.on_configuration_changed(() => {
     ModLog("Config changed");
     InitStorage();
-
-    // scanners built while the mod sealed the entity keep operable = false in the save
-    for (const [, surface] of game.surfaces) {
-        for (const entity of surface.find_entities_filtered({ name: ScannerName })) {
-            entity.operable = true;
-        }
-    }
-
-    // group names used to be generated and nothing else, so any stored name that is not
-    // the generated one was typed by the player and has to stay pinned rather than being
-    // replaced by a name derived from the network
-    for (const [id, name] of storage.logisticGroups) {
-        if (name != DefaultLogisticGroupName(id)) {
-            storage.pinnedGroups.add(id);
-        }
-    }
-
+    MigrateStorage();
     InitEvents();
 });

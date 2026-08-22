@@ -4,6 +4,10 @@
 #
 #   test/run.sh                 # run with the mod's default settings
 #   test/run.sh --groups        # also turn "Publish to logistic group" on
+#   test/run.sh --upgrade       # create the save with the PREVIOUS commit's build,
+#                               # then load it with this one. Catches storage added
+#                               # without a migration: on_configuration_changed does
+#                               # not fire between builds of the same mod version.
 #   FACTORIO=/path/to/binary test/run.sh
 #
 # Nothing here touches your real mods folder or saves.
@@ -16,7 +20,11 @@ WORK="$REPO/build/test"
 
 # note: GROUPS is a special read only array in bash, do not reuse that name
 WITH_GROUPS=0
-[ "${1:-}" = "--groups" ] && WITH_GROUPS=1
+UPGRADE=0
+case "${1:-}" in
+    --groups) WITH_GROUPS=1 ;;
+    --upgrade) WITH_GROUPS=1; UPGRADE=1 ;;
+esac
 
 [ -x "$FACTORIO" ] || { echo "Factorio binary not found at $FACTORIO (set FACTORIO=...)"; exit 1; }
 
@@ -57,9 +65,28 @@ if [ "$WITH_GROUPS" = "1" ]; then
         ghost-scanner-logistic-group=true
 fi
 
+if [ "$UPGRADE" = "1" ]; then
+    git -C "$REPO" diff --quiet -- src public locale || {
+        echo "--upgrade rebuilds src/public/locale from the previous commit, so those must be clean"
+        exit 1
+    }
+    PREV="$(git -C "$REPO" rev-parse --short HEAD~1)"
+    echo "==> building previous commit $PREV to write the save with"
+    git -C "$REPO" checkout -q "$PREV" -- src public locale
+    (cd "$REPO" && yarn build >/dev/null)
+    cp "$REPO"/build/GhostScanner4_*.zip "$WORK/mods/"
+    git -C "$REPO" checkout -q HEAD -- src public locale
+    (cd "$REPO" && yarn build >/dev/null)
+fi
+
 echo "==> creating map"
 "$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --create "$WORK/test.zip" 2>&1 \
     | grep -E "^ *[0-9.]+ (Error|Warning)" || true
+
+if [ "$UPGRADE" = "1" ]; then
+    echo "==> swapping in the current build and loading that save"
+    cp "$ZIP" "$WORK/mods/"
+fi
 
 echo "==> running $TICKS ticks"
 OUT="$("$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --benchmark "$WORK/test.zip" --benchmark-ticks "$TICKS" 2>&1 || true)"
