@@ -1,7 +1,7 @@
 import {
     BoundingBox,
     ComparatorString,
-    ItemStackDefinition,
+    ItemToPlace,
     LogisticFilterWrite,
     LuaConstantCombinatorControlBehavior,
     LuaEntity,
@@ -49,7 +49,7 @@ interface ScanArea {
 }
 
 interface Storage {
-    lookupItemsToPlaceThis: LuaMap<string, ItemStackDefinition[]>;
+    lookupItemsToPlaceThis: LuaMap<string, ItemToPlace[]>;
     ghostScanners: GhostScanner[];
     scanSignals: LuaMap<UnitNumber, LogisticFilterWrite[]>;
     signalIndexes: LuaMap<UnitNumber, LuaMap<string, number>>;
@@ -112,7 +112,7 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
         }
         case ShowHiddenSetting: {
             showHidden = settings.global[ShowHiddenSetting].value as boolean;
-            storage.lookupItemsToPlaceThis = new LuaMap<string, ItemStackDefinition[]>();
+            storage.lookupItemsToPlaceThis = new LuaMap<string, ItemToPlace[]>();
             break;
         }
         case NegativeOutputSetting: {
@@ -268,7 +268,7 @@ const GetItemsToPlace = (prototype: LuaEntityPrototype | LuaTilePrototype) => {
     if (showHidden) {
         storage.lookupItemsToPlaceThis.set(prototype.name, prototype.items_to_place_this || []);
     } else {
-        const itemsToPlaceFiltered: ItemStackDefinition[] = [];
+        const itemsToPlaceFiltered: ItemToPlace[] = [];
         if (prototype.items_to_place_this) {
             for (const v of prototype.items_to_place_this) {
                 const item = v.name && prototypes.item[v.name];
@@ -288,20 +288,24 @@ let signals: GhostsAsSignals | undefined = undefined;
 const AddSignal = (id: UnitNumber, name: string, count: number, quality?: QualityID) => {
     const indexesForID = storage.signalIndexes.get(id)!;
 
-    let item_uid = name;
+    let qualityName = "";
     if (quality) {
         const prototype_name = (quality as LuaQualityPrototype).name;
-        item_uid = prototype_name ?? quality;
+        qualityName = prototype_name ?? (quality as string);
     }
 
-    let signalIndex = indexesForID.get(item_uid);
+    // signals are identified by item and quality, so both have to be part of the
+    // lookup key: mixed qualities of one item must stay separate signals, while
+    // repeats of the same item and quality have to accumulate into one
+    const item_uid = `${name}/${qualityName}`;
+
+    const signalIndex = indexesForID.get(item_uid);
 
     let s: LogisticFilterWrite;
-    if (signalIndex && signals![signalIndex]) {
+    if (signalIndex !== undefined && signals![signalIndex]) {
         s = signals![signalIndex];
     } else {
-        signalIndex = signals!.length;
-        indexesForID.set(name, signalIndex);
+        indexesForID.set(item_uid, signals!.length);
         s = {
             value: {
                 comparator: "=",
@@ -522,7 +526,7 @@ const GetGhostsAsSignals = (
                 for (const itemStack of storage.lookupItemsToPlaceThis?.get(e.ghost_name) ||
                     GetItemsToPlace(e.ghost_prototype)) {
                     const count = itemStack.count!;
-                    AddSignal(id, itemStack.name, count, itemStack.quality);
+                    AddSignal(id, itemStack.name, count, e.quality);
                     countUniqueEntities -= count;
                 }
             }
@@ -679,7 +683,7 @@ const InitStorage = () => {
             UnitNumber,
             LuaSet<UnitNumber | MapPosition | LuaMultiReturn<[uint64, uint64, defines.target_type]>>
         >();
-    storage.lookupItemsToPlaceThis = new LuaMap<string, ItemStackDefinition[]>();
+    storage.lookupItemsToPlaceThis = new LuaMap<string, ItemToPlace[]>();
 };
 
 script.on_load(() => {
