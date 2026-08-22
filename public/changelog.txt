@@ -3,10 +3,13 @@ Version: 4.1.0
 Date: 2026-08-22
   Changes:
     - Ported to Factorio 2.1
+    - Item request proxies are tracked with a 2.1 notification queue instead of
+      permanent on_object_destroyed registrations
   Bugfixes:
     - Fixed tile ghosts outputting virtual signals instead of item signals
     - Fixed repeats of the same item and quality being emitted as one signal entry
       per ghost instead of being summed into a single entry
+    - Fixed cliff explosives being counted once per roboport covering the cliff
 ---------------------------------------------------------------------------------------------------
 Version: 4.0.6
 Date: 2025-11-30

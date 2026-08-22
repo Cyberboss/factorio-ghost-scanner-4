@@ -8,6 +8,7 @@ import {
     LuaEntityPrototype,
     LuaForce,
     LuaLogisticCell,
+    LuaNotificationQueue,
     LuaQualityPrototype,
     LuaTilePrototype,
     MapPosition,
@@ -22,7 +23,6 @@ import {
     ScriptRaisedReviveEvent,
     SignalFilter,
     SignalIDType,
-    uint64,
     UnitNumber
 } from "factorio:runtime";
 
@@ -54,10 +54,10 @@ interface Storage {
     scanSignals: LuaMap<UnitNumber, LogisticFilterWrite[]>;
     signalIndexes: LuaMap<UnitNumber, LuaMap<string, number>>;
     scanAreas: LuaMap<UnitNumber, ScanArea>;
-    foundEntities: LuaMap<
-        UnitNumber,
-        LuaSet<UnitNumber | MapPosition | LuaMultiReturn<[uint64, uint64, defines.target_type]>>
-    >;
+    // entities are keyed by unit number; cliffs and item request proxies have none,
+    // so they are keyed by prefixed strings that cannot collide with a unit number
+    foundEntities: LuaMap<UnitNumber, LuaSet<UnitNumber | string>>;
+    proxyRegistrations: LuaMap<UnitNumber, LuaNotificationQueue>;
     updateTimeout: boolean;
     updateIndex: number;
     initMod: boolean;
@@ -171,6 +171,7 @@ const CleanUp = (id: UnitNumber) => {
     storage.signalIndexes.delete(id);
     storage.scanAreas.delete(id);
     storage.foundEntities.delete(id);
+    storage.proxyRegistrations.delete(id);
 };
 
 const RemoveSensor = (id: UnitNumber) => {
@@ -341,9 +342,7 @@ const GetGhostsAsSignals = (
 
     let foundEntities = storage.foundEntities.get(id);
     if (!foundEntities) {
-        foundEntities = new LuaSet<
-            UnitNumber | MapPosition | LuaMultiReturn<[uint64, uint64, defines.target_type]>
-        >();
+        foundEntities = new LuaSet<UnitNumber | string>();
         storage.foundEntities.set(id, foundEntities);
     }
 
@@ -399,7 +398,9 @@ const GetGhostsAsSignals = (
     let countUniqueEntities = 0;
 
     for (const e of entities) {
-        const uid = e.unit_number || e.position;
+        // a fresh position table is returned on every read, so using it as a set key
+        // never matched and cliffs were recounted for every roboport covering them
+        const uid = `c${e.position.x}/${e.position.y}`;
         if (
             !foundEntities.has(uid) &&
             e.is_registered_for_deconstruction(force) &&
@@ -495,8 +496,18 @@ const GetGhostsAsSignals = (
             force: searchArea.force
         });
         countUniqueEntities = 0;
+        // item request proxies have no unit number. register_on_object_destroyed used to
+        // be abused for an id, but those registrations are permanent and accumulate in the
+        // save; a notification queue hands out the same kind of id and can be dropped with
+        // the scan that created it.
+        let proxyRegistrations = storage.proxyRegistrations.get(id);
+        if (!proxyRegistrations) {
+            proxyRegistrations = script.new_notification_queue();
+            storage.proxyRegistrations.set(id, proxyRegistrations);
+        }
+
         for (const e of entities) {
-            const uid = script.register_on_object_destroyed(e)[0] as UnitNumber; // abuse on_entity_destroyed to generate ids directly for proxies
+            const uid = `p${proxyRegistrations.add(e)}`;
             if (!foundEntities.has(uid)) {
                 foundEntities.add(uid);
                 for (const requestItem of e.item_requests) {
@@ -678,11 +689,8 @@ const InitStorage = () => {
     storage.signalIndexes =
         storage.signalIndexes || new LuaMap<UnitNumber, LuaMap<string, SignalFilter>>();
     storage.foundEntities =
-        storage.foundEntities ||
-        new LuaMap<
-            UnitNumber,
-            LuaSet<UnitNumber | MapPosition | LuaMultiReturn<[uint64, uint64, defines.target_type]>>
-        >();
+        storage.foundEntities || new LuaMap<UnitNumber, LuaSet<UnitNumber | string>>();
+    storage.proxyRegistrations = new LuaMap<UnitNumber, LuaNotificationQueue>();
     storage.lookupItemsToPlaceThis = new LuaMap<string, ItemToPlace[]>();
 };
 
