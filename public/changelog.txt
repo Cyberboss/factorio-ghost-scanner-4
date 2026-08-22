@@ -5,7 +5,9 @@ Date: 2026-08-22
     - Scanner results can be published as a logistic group, so requester chests and
       platform hubs can consume them directly without any circuit wiring (off by default)
     - Optional map alerts when a logistic network cannot supply what its ghosts request
-    - The logistic group can be renamed on the combinator and the new name is kept
+    - The logistic group is named after the logistic network the scanner sits in,
+      "Construction Requests for <network name>", and follows the network's renames
+    - The logistic group can be renamed on the combinator, which pins that name
   Changes:
     - Ghost Scanners can be opened again, so their logistic group can be renamed and
       the on/off switch is reachable outside the editor

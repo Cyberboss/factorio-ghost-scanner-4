@@ -64,6 +64,9 @@ interface Storage {
     // the logistic group name last applied per scanner, so a name the player typed
     // on the combinator can be told apart from one this mod put there
     logisticGroups: LuaMap<UnitNumber, string>;
+    // scanners whose group name the player typed. Those are left alone; every other
+    // scanner keeps deriving its name from the logistic network it sits in.
+    pinnedGroups: LuaSet<UnitNumber>;
     updateTimeout: boolean;
     updateIndex: number;
     initMod: boolean;
@@ -174,6 +177,61 @@ script.on_event(defines.events.on_runtime_mod_setting_changed, event => {
 // combinator and that name is then kept.
 const DefaultLogisticGroupName = (id: UnitNumber) => `Ghost Scanner ${id}`;
 
+const NetworkGroupPrefix = "Construction Requests for ";
+
+// Networks do not hold their name as tightly as they look: joining two swallows one of
+// the names, and splitting one leaves BOTH halves carrying it. A derived name is
+// therefore only taken when no scanner in another network has a better claim on it,
+// otherwise the two would take turns overwriting one shared filter list.
+//
+// The claim is settled on the lowest unit number rather than on who got there first,
+// because scanners are not visited in a fixed order: first come first served would hand
+// the name to a different scanner after a reload and silently re-point everything that
+// pointed at it.
+const NameClaimedElsewhere = (force: LuaForce, id: UnitNumber, networkId: number, name: string) => {
+    const group = force.get_logistic_group(name);
+    if (!group) {
+        return false;
+    }
+
+    for (const member of group.members) {
+        const owner = member.owner;
+        if (!owner.valid || owner.name != ScannerName || owner.unit_number == id) {
+            continue;
+        }
+
+        const ownerNetwork = owner.surface.find_logistic_network_by_position(
+            owner.position,
+            owner.force
+        );
+
+        // another scanner in the same network is welcome to share, it publishes the
+        // very same contents; one in a different network would fight over the group
+        if ((!ownerNetwork || ownerNetwork.network_id != networkId) && owner.unit_number! < id) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+const DeriveLogisticGroupName = (entity: LuaEntity, id: UnitNumber) => {
+    const fallback = DefaultLogisticGroupName(id);
+    const force = entity.force;
+    const network = entity.surface.find_logistic_network_by_position(entity.position, force);
+    if (!network || !network.custom_name || network.custom_name == "") {
+        return fallback;
+    }
+
+    const derived = `${NetworkGroupPrefix}${network.custom_name}`;
+    if (NameClaimedElsewhere(force, id, network.network_id, derived)) {
+        ModLog(`Scanner ${id} cannot claim ${derived}, another network holds it`);
+        return fallback;
+    }
+
+    return derived;
+};
+
 // A group is force wide state that outlives the sections feeding it. One this mod no
 // longer writes to is dropped rather than left behind: its filters would freeze at the
 // last scan and any chest still pointing at it would silently keep requesting them.
@@ -193,7 +251,9 @@ const DropUnusedLogisticGroup = (force: LuaForce, name: string) => {
     force.delete_logistic_group(name);
 };
 
-const ApplyLogisticGroup = (force: LuaForce, id: UnitNumber, section: LuaLogisticSection) => {
+const ApplyLogisticGroup = (ghostScanner: GhostScanner, section: LuaLogisticSection) => {
+    const id = ghostScanner.id;
+    const force = ghostScanner.entity.force;
     const applied = storage.logisticGroups.get(id);
 
     if (!publishLogisticGroup) {
@@ -203,6 +263,7 @@ const ApplyLogisticGroup = (force: LuaForce, id: UnitNumber, section: LuaLogisti
             }
 
             storage.logisticGroups.delete(id);
+            storage.pinnedGroups.delete(id);
             DropUnusedLogisticGroup(force, applied);
         }
 
@@ -211,18 +272,28 @@ const ApplyLogisticGroup = (force: LuaForce, id: UnitNumber, section: LuaLogisti
 
     const current = section.group;
     if (applied != undefined && current != "" && current != applied) {
-        // the player renamed the group on the combinator, so follow them there rather
-        // than dragging the section back to the generated name on every scan
+        // the player renamed the group on the combinator. That pins it: the network
+        // name stops driving it from here on.
         ModLog(`Scanner ${id} logistic group renamed from ${applied} to ${current}`);
         storage.logisticGroups.set(id, current);
+        storage.pinnedGroups.add(id);
         DropUnusedLogisticGroup(force, applied);
         return;
     }
 
-    const name = applied ?? DefaultLogisticGroupName(id);
+    const name = storage.pinnedGroups.has(id)
+        ? (applied ?? DefaultLogisticGroupName(id))
+        : DeriveLogisticGroupName(ghostScanner.entity, id);
+
     if (current != name) {
         force.create_logistic_group(name);
         section.group = name;
+    }
+
+    if (applied != undefined && applied != name) {
+        // the network was renamed underneath us, so the group moved with it
+        ModLog(`Scanner ${id} logistic group moved from ${applied} to ${name}`);
+        DropUnusedLogisticGroup(force, applied);
     }
 
     storage.logisticGroups.set(id, name);
@@ -231,6 +302,7 @@ const ApplyLogisticGroup = (force: LuaForce, id: UnitNumber, section: LuaLogisti
 const DeleteLogisticGroup = (force: LuaForce, id: UnitNumber) => {
     force.delete_logistic_group(storage.logisticGroups.get(id) ?? DefaultLogisticGroupName(id));
     storage.logisticGroups.delete(id);
+    storage.pinnedGroups.delete(id);
 };
 
 const MaxAlertsPerScanner = 5;
@@ -387,7 +459,7 @@ const UpdateArea = () => {
 
                     ClearCombinator(controlBehavior);
                     const section = controlBehavior.get_section(1)!;
-                    ApplyLogisticGroup(ghostScanner.entity.force, id, section);
+                    ApplyLogisticGroup(ghostScanner, section);
 
                     const signalsForCombinator = storage.scanSignals.get(id);
                     if (signalsForCombinator && signalsForCombinator.length > 0) {
@@ -842,6 +914,7 @@ const InitStorage = () => {
         storage.foundEntities || new LuaMap<UnitNumber, LuaSet<UnitNumber | string>>();
     storage.proxyRegistrations = new LuaMap<UnitNumber, LuaNotificationQueue>();
     storage.logisticGroups = storage.logisticGroups || new LuaMap<UnitNumber, string>();
+    storage.pinnedGroups = storage.pinnedGroups || new LuaSet<UnitNumber>();
     storage.lookupItemsToPlaceThis = new LuaMap<string, ItemToPlace[]>();
 };
 
@@ -864,6 +937,15 @@ script.on_configuration_changed(() => {
     for (const [, surface] of game.surfaces) {
         for (const entity of surface.find_entities_filtered({ name: ScannerName })) {
             entity.operable = true;
+        }
+    }
+
+    // group names used to be generated and nothing else, so any stored name that is not
+    // the generated one was typed by the player and has to stay pinned rather than being
+    // replaced by a name derived from the network
+    for (const [id, name] of storage.logisticGroups) {
+        if (name != DefaultLogisticGroupName(id)) {
+            storage.pinnedGroups.add(id);
         }
     }
 

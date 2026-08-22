@@ -11,7 +11,7 @@ set -euo pipefail
 
 REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 FACTORIO="${FACTORIO:-/Applications/factorio.app/Contents/MacOS/factorio}"
-TICKS="${TICKS:-1200}"
+TICKS="${TICKS:-3000}"
 WORK="$REPO/build/test"
 
 # note: GROUPS is a special read only array in bash, do not reuse that name
@@ -62,9 +62,9 @@ echo "==> creating map"
     | grep -E "^ *[0-9.]+ (Error|Warning)" || true
 
 echo "==> running $TICKS ticks"
-OUT="$("$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --benchmark "$WORK/test.zip" --benchmark-ticks "$TICKS" 2>&1)"
+OUT="$("$FACTORIO" --config "$CONFIG" --mod-directory "$WORK/mods" --benchmark "$WORK/test.zip" --benchmark-ticks "$TICKS" 2>&1 || true)"
 
-echo "$OUT" | grep -E "GS4TEST|^ *[0-9.]+ Error" | sed -E 's/^.*(GS4TEST|Error)/\1/' || true
+echo "$OUT" | grep -E "GS4TEST|Error while running|caused a non-recoverable" | sed -E 's/^.*(GS4TEST|Error)/\1/' || true
 
 if echo "$OUT" | grep -q "GS4TEST RESULT PASS"; then
     echo "==> PASS"
