@@ -15,3 +15,6 @@ node_modules/**
 build/**
 
 *.lua
+
+# the compiler emits lua into src/, but the test scenario is hand written source
+!test/harness/*.lua
